@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "Motix",
+  "version": "1.0.0",
+  "description": "Customize the look and feel of supported Movix websites with simple visual themes.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "optional_host_permissions": ["https://movix.online/*"],
+  "host_permissions": [
+    "https://*.movix.cash/*", "http://*.movix.cash/*",
+    "https://*.movix.cloud/*", "http://*.movix.cloud/*",
+    "https://*.movix.tax/*", "http://*.movix.tax/*",
+    "https://*.movix.club/*", "http://*.movix.club/*",
+    "https://*.movix.golf/*", "http://*.movix.golf/*",
+    "https://*.movix.chat/*", "http://*.movix.chat/*",
+    "https://*.movix.date/*", "http://*.movix.date/*",
+    "https://*.movix.fun/*", "http://*.movix.fun/*",
+    "https://*.movix.show/*", "http://*.movix.show/*",
+    "https://*.movix.men/*", "http://*.movix.men/*",
+    "https://*.movix.college/*", "http://*.movix.college/*"
+  ],
+  "background": { "scripts": ["service-worker.js"] },
+  "action": { "default_title": "Motix", "default_popup": "popup.html" },
+  "browser_specific_settings": { "gecko": { "id": "motix@freebuff.local", "strict_min_version": "128.0" } },
+  "content_scripts": [{
+    "matches": [
+      "https://*.movix.cash/*", "http://*.movix.cash/*",
+      "https://*.movix.cloud/*", "http://*.movix.cloud/*",
+      "https://*.movix.tax/*", "http://*.movix.tax/*",
+      "https://*.movix.club/*", "http://*.movix.club/*",
+      "https://*.movix.golf/*", "http://*.movix.golf/*",
+      "https://*.movix.chat/*", "http://*.movix.chat/*",
+      "https://*.movix.date/*", "http://*.movix.date/*",
+      "https://*.movix.fun/*", "http://*.movix.fun/*",
+      "https://*.movix.show/*", "http://*.movix.show/*",
+      "https://*.movix.men/*", "http://*.movix.men/*",
+      "https://*.movix.college/*", "http://*.movix.college/*"
+    ],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }],
+  "web_accessible_resources": [{
+    "resources": ["themes.html", "assets/*.js", "assets/*.css", "fonts/*"],
+    "matches": [
+      "https://*.movix.cash/*", "http://*.movix.cash/*",
+      "https://*.movix.cloud/*", "http://*.movix.cloud/*",
+      "https://*.movix.tax/*", "http://*.movix.tax/*",
+      "https://*.movix.club/*", "http://*.movix.club/*",
+      "https://*.movix.golf/*", "http://*.movix.golf/*",
+      "https://*.movix.chat/*", "http://*.movix.chat/*",
+      "https://*.movix.date/*", "http://*.movix.date/*",
+      "https://*.movix.fun/*", "http://*.movix.fun/*",
+      "https://*.movix.show/*", "http://*.movix.show/*",
+      "https://*.movix.men/*", "http://*.movix.men/*",
+      "https://*.movix.college/*", "http://*.movix.college/*"
+    ]
+  }]
+}
