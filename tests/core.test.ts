@@ -81,6 +81,7 @@ test('theme CSS targets verified Movix page shells and current media-card color 
   assert.match(css, /\.section-title/);
   assert.ok(css.includes('.platform-link > div[class~="bg-white"]'));
   assert.ok(css.includes('.platform-link p[class~="bg-black/60"]'));
+  assert.ok(css.includes('header span[class~="text-red-600"]'));
   assert.match(css, /#root \.min-h-screen\.bg-black/);
   assert.match(css, /\[class~="bg-gray-800"\]/);
   assert.match(css, /#root input/);

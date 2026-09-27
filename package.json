@@ -8,6 +8,7 @@
     "build:chrome": "vite build && vite build --config vite.content.config.ts && bun scripts/package.mjs chrome",
     "build:firefox": "vite build && vite build --config vite.content.config.ts && bun scripts/package.mjs firefox",
     "typecheck": "tsc --noEmit",
+    "generate:logos": "bun scripts/generate-logos.mjs",
     "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {

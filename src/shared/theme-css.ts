@@ -153,6 +153,12 @@ html[data-motix-theme] #root .media-color-card:hover {
   border-color: var(--motix-primary) !important;
 }
 html[data-motix-theme] #root .media-card-muted { color: var(--motix-muted) !important; }
+
+/* The site logo is text (span.text-red-600 inside the fixed header). */
+html[data-motix-theme] header span[class~="text-red-600"] {
+  color: var(--motix-primary) !important;
+  -webkit-text-fill-color: var(--motix-primary) !important;
+}
 html[data-motix-theme] #root .section-title {
   color: var(--motix-primary) !important;
   background-image: none !important;

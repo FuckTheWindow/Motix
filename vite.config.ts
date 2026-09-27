@@ -5,7 +5,7 @@ const fromRoot = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 
 export default defineConfig({
   root: '.',
-  publicDir: false,
+  publicDir: 'public',
   build: {
     outDir: 'dist',
     emptyOutDir: true,
