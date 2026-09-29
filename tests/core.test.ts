@@ -22,9 +22,14 @@ test('directory parsing keeps only validated, pre-approved Movix hosts', () => {
 });
 
 test('default theme set includes every requested preset', () => {
-  assert.equal(DEFAULT_THEMES.length, 12);
+  assert.equal(DEFAULT_THEMES.length, 16);
   assert.ok(DEFAULT_THEMES.some((theme) => theme.id === 'retro-green'));
   assert.ok(DEFAULT_THEMES.some((theme) => theme.id === 'terminal'));
+
+  const animeThemes = DEFAULT_THEMES.filter((theme) => ['one-punch-man', 'onimai', 'dragon-ball-z', 'demon-slayer'].includes(theme.id));
+  assert.equal(animeThemes.length, 4);
+  assert.equal(DEFAULT_THEMES.find((theme) => theme.id === 'onimai')?.colors.primary, '#f472b6');
+  assert.equal(DEFAULT_THEMES.find((theme) => theme.id === 'dragon-ball-z')?.colors.primary, '#f97316');
 });
 
 test('settings default is enabled and starts from Original', () => {

@@ -17,7 +17,7 @@ Directory refresh is optional and user initiated. The response is size- and time
 ## Architecture
 
 - `src/shared`: strict types, hostname allowlist, schema migration, browser storage, validators, and CSS variable generation.
-- `src/data/themes.ts`: twelve editable built-in presets.
+- `src/data/themes.ts`: sixteen editable built-in presets, including anime-inspired styles for One Punch Man, Onimai, Dragon Ball Z, and Demon Slayer.
 - `src/content`: guarded content injection and lightweight history/popstate route detection.
 - `src/ui`: accessible popup, editor, preview, and isolated stylesheet.
 - `manifest.chrome.json` and `manifest.firefox.json`: minimal browser manifests.
