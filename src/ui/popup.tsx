@@ -1,6 +1,8 @@
-import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { MotixPopup } from './MotixApp';
+import { PopupApp } from './popup/PopupApp';
 import './editor.css';
 
-createRoot(document.getElementById('root')!).render(<MotixPopup />);
+// `?site=` pins the popup to a hostname instead of the active tab (used by the browser tests).
+const site = new URLSearchParams(location.search).get('site') ?? undefined;
+
+createRoot(document.getElementById('root')!).render(<PopupApp site={site} />);

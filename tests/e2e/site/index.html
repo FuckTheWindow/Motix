@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- A miniature Movix page: same root element and class conventions as the real site, no network. -->
+<html lang="fr" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Movix fixture</title>
+    <link rel="stylesheet" href="/site.css" />
+  </head>
+  <body class="bg-black text-white">
+    <div id="root">
+      <header><span id="logo" class="text-red-600">MOVIX</span></header>
+      <div id="hero" class="relative">
+        <img class="absolute" alt="" />
+        <p id="hero-text" class="text-white">À la une</p>
+        <a id="hero-cta" class="bg-red-600 text-white">Plus d'infos</a>
+      </div>
+      <h2 id="title" class="section-title text-white">Tendances</h2>
+      <button id="cta" class="bg-red-600 hover:bg-red-700 text-white rounded-lg">Regarder</button>
+      <div id="panel" class="bg-gray-800 border border-gray-700 text-gray-400">Synopsis</div>
+      <span id="status" class="text-green-400">Disponible</span>
+      <div id="card" class="media-color-card" style="--media-color: 1, 2, 3; --media-color-surface: 4, 5, 6">Affiche</div>
+      <div id="player">
+        <video></video>
+        <div data-player-controls="">
+          <button id="player-button" class="bg-red-600 text-white rounded-lg">Lecture</button>
+        </div>
+      </div>
+      <button id="spa-themes" onclick="history.pushState({}, '', '/themes')">Thèmes</button>
+      <output id="route"></output>
+    </div>
+    <script>
+      // Stands in for Movix's client-side router: it re-renders on popstate.
+      const render = () => { document.getElementById('route').textContent = location.pathname; };
+      window.addEventListener('popstate', render);
+      render();
+    </script>
+  </body>
+</html>

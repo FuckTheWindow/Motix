@@ -81,9 +81,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .motix-preview-modal { padding:11px; margin-top:12px; border:1px solid var(--preview-border); border-radius:var(--preview-radius); background:var(--preview-surface); }
 .motix-preview-modal strong { font-size:10px; }
 .motix-preview-modal p { margin:4px 0 0; color:var(--preview-muted); font-size:9px; }
-.motix-atmo-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
-.motix-atmo-grid button { padding:8px 5px; border:1px solid #ffffff17; border-radius:10px; color:#dfe7dc; background:#ffffff06; font-size:10px; }
-.motix-atmo-grid button[aria-pressed='true'] { border-color:#a1dc73; color:#c4f49f; }
+.motix-steps { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; }
+.motix-steps button { padding:8px 5px; border:1px solid #ffffff17; border-radius:10px; color:#dfe7dc; background:#ffffff06; font-size:10px; }
+.motix-steps button[aria-pressed='true'] { border-color:#a1dc73; color:#c4f49f; }
 .motix-inline { display:flex; gap:8px; align-items:center; }
 .motix-inline > * { flex:1; }
 .motix-advanced { margin-top:16px; padding-top:14px; border-top:1px solid #ffffff12; }
@@ -107,5 +107,5 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .motix-popup-footer { margin-top:13px; color:#8b9488; font-size:10px; line-height:1.5; }
 .motix-import-label { display:inline-flex; align-items:center; }
 @media (max-width:850px) { .motix-layout { grid-template-columns:1fr; } .motix-preview-panel { order:-1; } }
-@media (max-width:560px) { .motix-page-wrap { padding:23px 14px 34px; } .motix-topbar { padding:0 15px; } .motix-intro { align-items:flex-start; flex-direction:column; } .motix-layout { gap:13px; } .motix-panel { padding:16px; border-radius:16px; } .motix-presets { grid-template-columns:repeat(2,minmax(0,1fr)); } .motix-color-grid { grid-template-columns:1fr; } .motix-atmo-grid { grid-template-columns:repeat(2,1fr); } .motix-top-actions .motix-btn { padding:7px 9px; } }
+@media (max-width:560px) { .motix-page-wrap { padding:23px 14px 34px; } .motix-topbar { padding:0 15px; } .motix-intro { align-items:flex-start; flex-direction:column; } .motix-layout { gap:13px; } .motix-panel { padding:16px; border-radius:16px; } .motix-presets { grid-template-columns:repeat(2,minmax(0,1fr)); } .motix-color-grid { grid-template-columns:1fr; } .motix-steps { grid-template-columns:repeat(2,1fr); } .motix-top-actions .motix-btn { padding:7px 9px; } }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; } }

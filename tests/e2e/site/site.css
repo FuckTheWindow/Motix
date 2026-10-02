@@ -1,0 +1,16 @@
+/* The subset of Movix's compiled Tailwind stylesheet the fixture page uses, in the same output format. */
+.bg-black{--tw-bg-opacity:1;background-color:rgba(0,0,0,var(--tw-bg-opacity,1))}
+.bg-red-600{--tw-bg-opacity:1;background-color:rgba(220,38,38,var(--tw-bg-opacity,1))}
+.hover\:bg-red-700:hover{--tw-bg-opacity:1;background-color:rgba(185,28,28,var(--tw-bg-opacity,1))}
+.bg-gray-800{--tw-bg-opacity:1;background-color:rgba(31,41,55,var(--tw-bg-opacity,1))}
+.border{border-width:1px;border-style:solid}
+.border-gray-700{--tw-border-opacity:1;border-color:rgba(55,65,81,var(--tw-border-opacity,1))}
+.text-white{--tw-text-opacity:1;color:rgba(255,255,255,var(--tw-text-opacity,1))}
+.text-red-600{--tw-text-opacity:1;color:rgba(220,38,38,var(--tw-text-opacity,1))}
+.text-gray-400{--tw-text-opacity:1;color:rgba(156,163,175,var(--tw-text-opacity,1))}
+.text-green-400{--tw-text-opacity:1;color:rgba(74,222,128,var(--tw-text-opacity,1))}
+.rounded-lg{border-radius:.5rem}
+.media-color-card{background-color:rgb(var(--media-color-surface));border:1px solid rgba(var(--media-color),.3)}
+.relative{position:relative}
+.absolute{position:absolute}
+button{border:0;padding:8px 16px}

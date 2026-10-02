@@ -1,5 +1,5 @@
-import type { MotixTheme } from './types';
-import { DEFAULT_THEMES } from '../data/themes';
+import type { MotixTheme } from '../shared/types';
+import { DEFAULT_THEMES } from './presets';
 
 export const MAX_THEME_BYTES = 128 * 1024;
 export const MAX_CUSTOM_CSS = 16 * 1024;

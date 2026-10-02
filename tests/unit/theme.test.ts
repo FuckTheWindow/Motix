@@ -1,0 +1,122 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { hexToRgb, hslToRgb, rgbToHsl } from '../../src/theme/color';
+import tokens from '../../src/theme/generated/tokens.json' with { type: 'json' };
+import { themeTokenValues } from '../../src/theme/palette';
+import { DEFAULT_THEMES } from '../../src/theme/presets';
+import { generateThemeCss } from '../../src/theme/theme-css';
+import { MAX_THEME_BYTES, parseThemeImport, validateCustomCss, validateTheme } from '../../src/theme/validation';
+
+const retroGreen = DEFAULT_THEMES.find((theme) => theme.id === 'retro-green')!;
+const light = DEFAULT_THEMES.find((theme) => theme.id === 'minimal-light')!;
+
+test('every preset is a valid theme with a unique id', () => {
+  assert.equal(DEFAULT_THEMES[0]!.id, 'original');
+  assert.equal(new Set(DEFAULT_THEMES.map((theme) => theme.id)).size, DEFAULT_THEMES.length);
+  for (const theme of DEFAULT_THEMES) assert.equal(validateTheme(theme), true, theme.id);
+});
+
+test('colour conversions round-trip', () => {
+  assert.deepEqual(hexToRgb('#fff'), [255, 255, 255]);
+  for (const hex of ['#dc2626', '#4ade80', '#18202b', '#000000']) {
+    assert.deepEqual(hslToRgb(rgbToHsl(hexToRgb(hex))), hexToRgb(hex), hex);
+  }
+});
+
+test('Movix brand red follows the accent, shade for shade', () => {
+  const values = themeTokenValues(retroGreen.colors, ['bg-220-38-38', 'bg-185-28-28', 'fg-248-113-113', 'sh-239-68-68']);
+  assert.deepEqual(values['bg-220-38-38'], hexToRgb(retroGreen.colors.primary));
+  assert.deepEqual(values['bg-185-28-28'], hexToRgb(retroGreen.colors.primaryHover));
+  const [hue] = rgbToHsl(hexToRgb(retroGreen.colors.primary));
+  // red-400 is lighter than the brand base, so its themed shade is a lighter accent of the same hue.
+  const lighter = rgbToHsl(values['fg-248-113-113']!);
+  assert.ok(Math.abs(lighter[0] - hue) < 2);
+  assert.ok(lighter[2] > rgbToHsl(hexToRgb(retroGreen.colors.primary))[2]);
+  assert.ok(values['sh-239-68-68'], 'accent-coloured shadows are themed too');
+});
+
+test('neutrals follow the theme ramp and invert on a light theme', () => {
+  const values = themeTokenValues(light.colors, ['bg-0-0-0', 'fg-255-255-255', 'bg-255-255-255', 'fg-0-0-0', 'bg-31-41-55', 'bd-55-65-81']);
+  assert.deepEqual(values['bg-0-0-0'], hexToRgb(light.colors.background));
+  assert.deepEqual(values['fg-255-255-255'], hexToRgb(light.colors.text));
+  assert.deepEqual(values['bg-255-255-255'], hexToRgb(light.colors.text), 'white surfaces become the inverse surface');
+  assert.deepEqual(values['fg-0-0-0'], hexToRgb(light.colors.background), 'so text on them flips as well');
+  assert.deepEqual(values['bg-31-41-55'], hexToRgb(light.colors.card), 'gray-800 is the card surface');
+  assert.deepEqual(values['bd-55-65-81'], hexToRgb(light.colors.border), 'gray-700 is the border colour');
+});
+
+test('the gray scale lands exactly on the theme surfaces for every preset', () => {
+  for (const theme of DEFAULT_THEMES) {
+    const values = themeTokenValues(theme.colors, ['bg-17-24-39', 'bg-31-41-55', 'bg-55-65-81', 'bd-55-65-81', 'fg-156-163-175']);
+    assert.deepEqual(values['bg-17-24-39'], hexToRgb(theme.colors.surface), theme.id);
+    assert.deepEqual(values['bg-31-41-55'], hexToRgb(theme.colors.card), theme.id);
+    assert.deepEqual(values['bg-55-65-81'], hexToRgb(theme.colors.cardHover), theme.id);
+    assert.deepEqual(values['bd-55-65-81'], hexToRgb(theme.colors.border), theme.id);
+    assert.deepEqual(values['fg-156-163-175'], hexToRgb(theme.colors.muted), theme.id);
+  }
+});
+
+test('status colours and neutral shadows keep Movix own values', () => {
+  const values = themeTokenValues(retroGreen.colors, ['fg-74-222-128', 'bg-234-179-8', 'bg-59-130-246', 'sh-0-0-0', 'not-a-token']);
+  assert.deepEqual(values, {});
+});
+
+test('the real adapter tokens are all understood', () => {
+  assert.ok(tokens.length > 100);
+  for (const token of tokens) assert.match(token, /^(bg|fg|bd|sh)-\d+-\d+-\d+$/);
+  const mapped = Object.keys(themeTokenValues(retroGreen.colors, tokens));
+  assert.ok(mapped.length > 50, `only ${mapped.length} tokens mapped`);
+  assert.ok(mapped.includes('bg-220-38-38') && mapped.includes('fg-255-255-255'));
+});
+
+test('theme CSS assigns tokens, scales radius and keeps accent text readable', () => {
+  const css = generateThemeCss(retroGreen);
+  assert.match(css, /--mx-bg-220-38-38: 74,222,128;/);
+  assert.match(css, /--mx-radius-scale: 0\.500;/);
+  assert.match(css, /--motix-on-primary: #101010/);
+  assert.match(css, /color-scheme: dark !important/);
+  assert.match(css, /font-family: ui-monospace/);
+  assert.match(css, /\.media-color-card \{\s+--media-color: 74, 222, 128 !important/);
+  assert.match(generateThemeCss(light), /color-scheme: light !important/);
+  assert.doesNotMatch(generateThemeCss(light), /font-family/);
+});
+
+test('the player keeps its own colours unless the user opts in', () => {
+  assert.match(generateThemeCss(retroGreen), /\[data-player-controls\][^{]*\{\s+[^}]*--mx-bg-220-38-38: initial;/);
+  assert.doesNotMatch(generateThemeCss(retroGreen, { themePlayer: true }), /data-player-controls/);
+});
+
+test('over artwork, neutrals fall back to the original colours but the accent stays themed', () => {
+  const artwork = /:has\(> img\.absolute\)[^{]*\{([^}]*)\}/.exec(generateThemeCss(light))?.[1] ?? '';
+  assert.match(artwork, /--mx-fg-255-255-255: initial;/);
+  assert.match(artwork, /--mx-bg-0-0-0: initial;/);
+  assert.doesNotMatch(artwork, /--mx-bg-220-38-38/);
+});
+
+test('custom CSS is scoped, and dropped when it targets the page shell', () => {
+  const scoped = generateThemeCss({ ...retroGreen, customCss: '.a { border-width: 2px; }\n.b, .c { margin: 0; }' });
+  assert.ok(scoped.includes('[data-motix-theme] .a { border-width: 2px; }'));
+  assert.ok(scoped.includes('[data-motix-theme] .b, [data-motix-theme] .c { margin: 0; }'));
+  assert.doesNotMatch(generateThemeCss({ ...retroGreen, customCss: 'body { display: none; }' }), /display:\s*none/);
+  assert.doesNotMatch(generateThemeCss({ ...retroGreen, customCss: '@media print { .a { display: none; } }' }), /display:\s*none/);
+});
+
+test('custom CSS blocks scripts, urls, imports, and unbalanced rules', () => {
+  assert.equal(validateCustomCss('.carousel-card { border: 1px solid #fff; }').valid, true);
+  assert.equal(validateCustomCss('@import url(https://example.test/a.css);').valid, false);
+  assert.equal(validateCustomCss('.x { background: url(https://example.test/a); }').valid, false);
+  assert.equal(validateCustomCss('<script>alert(1)</script>').valid, false);
+  assert.equal(validateCustomCss('.x { color: red;').valid, false);
+  assert.equal(validateCustomCss(`.x { color: red; } /* ${'x'.repeat(17_000)} */`).valid, false);
+});
+
+test('theme import accepts a valid custom theme and rejects bad input', () => {
+  const theme = { ...retroGreen, id: 'my-theme', name: 'My Theme', isCustom: true };
+  assert.equal(parseThemeImport(JSON.stringify({ schemaVersion: 1, theme })).id, 'my-theme');
+  assert.equal(parseThemeImport(JSON.stringify(theme)).isCustom, true);
+  assert.throws(() => parseThemeImport('{broken'), /valid theme JSON/);
+  assert.throws(() => parseThemeImport('x'.repeat(MAX_THEME_BYTES + 1)), /128 KB/);
+  assert.throws(() => parseThemeImport(JSON.stringify({ id: 'bad', colors: {} })), /invalid settings/);
+  assert.throws(() => parseThemeImport(JSON.stringify(retroGreen)), /built-in theme/);
+  assert.throws(() => parseThemeImport(JSON.stringify({ ...theme, customCss: '@import "x";' })), /invalid settings/);
+});

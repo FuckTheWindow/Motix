@@ -1,19 +1,20 @@
 import type { MotixTheme } from '../shared/types';
-import { generateThemeCss } from '../shared/theme-css';
+import { generateThemeCss, type ThemeCssOptions } from '../theme/theme-css';
 
 const STYLE_ID = 'motix-theme-styles';
 
-export function applyTheme(theme: MotixTheme): void {
-  if (!document.documentElement) return;
-  document.documentElement.dataset.motixTheme = theme.id;
+// The adapter stylesheet shipped in the manifest only matches while this attribute is set,
+// so adding and removing it (plus one <style> for the theme's variables) is all it takes.
+export function applyTheme(theme: MotixTheme, options: ThemeCssOptions): void {
+  const root = document.documentElement;
   let style = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
   if (!style) {
     style = document.createElement('style');
     style.id = STYLE_ID;
-    style.dataset.motixOwned = 'true';
-    (document.head ?? document.documentElement).append(style);
+    (document.head ?? root).append(style);
   }
-  style.textContent = generateThemeCss(theme);
+  style.textContent = generateThemeCss(theme, options);
+  root.dataset.motixTheme = theme.id;
 }
 
 export function removeTheme(): void {
