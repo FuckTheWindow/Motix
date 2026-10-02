@@ -91,7 +91,8 @@ export async function saveTheme(theme: MotixTheme, hostname?: string): Promise<v
     ...settings,
     customThemes,
     globalThemeId: hostname ? settings.globalThemeId : theme.id,
-    domainThemes: hostname ? { ...settings.domainThemes, [normalizeHostname(hostname)]: theme.id } : settings.domainThemes,
+    // A global choice replaces per-domain ones, so "every Movix website" means every one.
+    domainThemes: hostname ? { ...settings.domainThemes, [normalizeHostname(hostname)]: theme.id } : {},
   });
 }
 
@@ -100,7 +101,7 @@ export async function selectTheme(themeId: string, hostname?: string): Promise<v
   const settings = await getSettings();
   await saveSettings(hostname
     ? { ...settings, domainThemes: { ...settings.domainThemes, [normalizeHostname(hostname)]: themeId } }
-    : { ...settings, globalThemeId: themeId });
+    : { ...settings, globalThemeId: themeId, domainThemes: {} });
 }
 
 export async function setEnabled(enabled: boolean, hostname?: string): Promise<void> {

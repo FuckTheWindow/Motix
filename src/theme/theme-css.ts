@@ -2,7 +2,7 @@
 // which rewires every Movix colour to a `--mx-*` custom property; this module only assigns
 // those properties and adds the few rules a colour remap cannot express.
 import type { MotixTheme } from '../shared/types';
-import { hexToRgb, isLight } from './color';
+import { hexToRgb, hueRotationTo, isLight, rgbToHsl } from './color';
 import tokens from './generated/tokens.json';
 import { isNeutralToken, themeTokenValues } from './palette';
 import { validateCustomCss } from './validation';
@@ -21,6 +21,11 @@ const BRAND_BUTTONS = ':is(.bg-red-500, .bg-red-600, .bg-red-700, .hover\\:bg-re
 // Movix's corners are designed around this radius; the slider scales them relative to it.
 const BASE_RADIUS_PX = 12;
 const MAX_RADIUS_PX = 32;
+// Anything Movix presents as a button: real buttons, plus links styled as one.
+const BUTTONS = ':is(button, [role="button"], a[class~="inline-flex"])';
+// The red Movix draws its pointer grid with, and the saturation below which an accent counts as gray.
+const GRID_RED = [239, 68, 68] as const;
+const MIN_TINT_SATURATION = 0.12;
 const MONOSPACE = 'ui-monospace, SFMono-Regular, Menlo, monospace';
 
 function scopedCustomCss(css: string): string {
@@ -48,11 +53,16 @@ export function generateThemeCss(theme: MotixTheme, options: ThemeCssOptions = {
   const radius = Math.max(0, Math.min(MAX_RADIUS_PX, theme.radius));
   const glow = Math.round(theme.glow * 0.14);
   const shadowAlpha = Math.min(0.72, theme.shadow / 150).toFixed(2);
-  const buttonOffset = Math.round((theme.buttonSize - 50) / 25);
+  // The slider's midpoint leaves buttons untouched; its ends shrink or grow them by 20%.
+  const buttonScale = 0.8 + Math.max(0, Math.min(100, theme.buttonSize)) / 250;
+  const primary = hexToRgb(c.primary);
+  // Canvas pixels are out of CSS's reach, but a filter can turn their red into the accent's hue.
+  const gridFilter = rgbToHsl(primary)[1] < MIN_TINT_SATURATION ? 'grayscale(1)' : `hue-rotate(${hueRotationTo(GRID_RED, primary)}deg)`;
 
   const variables = [
     ...tokenNames.map((token) => `--mx-${token}: ${tokenValues[token]!.join(',')};`),
     `--mx-radius-scale: ${(radius / BASE_RADIUS_PX).toFixed(3)};`,
+    `--mx-button-scale: ${buttonScale.toFixed(3)};`,
     `--motix-background: ${c.background};`,
     `--motix-surface: ${c.surface};`,
     `--motix-card: ${c.card};`,
@@ -73,7 +83,7 @@ export function generateThemeCss(theme: MotixTheme, options: ThemeCssOptions = {
   const playerReset = options.themePlayer ? '' : `
 /* The player keeps Movix's own look. */
 ${SCOPE} ${PLAYER_SCOPE} {
-  ${reset([...tokenNames, 'radius-scale'])}
+  ${reset([...tokenNames, 'radius-scale', 'button-scale'])}
 }`;
 
   return `${SCOPE} {
@@ -86,7 +96,12 @@ ${SCOPE} #root {
   background-color: var(--motix-background) !important;
   color: var(--motix-text) !important;
 }
-${theme.style === 'retro' ? `${SCOPE} body { font-family: ${MONOSPACE} !important; }\n` : ''}
+${theme.style === 'retro' ? `${SCOPE} body,\n${SCOPE} #root :is(.font-sans, button, input, select, textarea) {\n  font-family: ${MONOSPACE} !important;\n}\n` : ''}
+/* \`zoom\` scales a button's text, padding and icon together, whatever classes built it. */
+${SCOPE} #root ${BUTTONS} {
+  zoom: var(--mx-button-scale, 1);
+}
+
 /* Poster cards take their tint from inline per-poster variables, which no colour remap can reach. */
 ${SCOPE} #root .media-color-card {
   --media-color: ${hexToRgb(c.primary).join(', ')} !important;
@@ -113,12 +128,20 @@ ${SCOPE} #root .section-title::after {
   background: var(--motix-primary) !important;
 }
 
+/* The grid that lights up under the pointer is painted in red on a canvas, and its halo is an inline gradient. */
+${SCOPE} #root canvas.absolute.inset-0.z-0.pointer-events-none {
+  filter: ${gridFilter} !important;
+}
+${SCOPE} #root .square-bg-halo {
+  background: radial-gradient(circle, rgba(${primary.join(', ')}, 0.15) 0%, transparent 70%) !important;
+}
+
 /* Text on the accent colour must stay readable whatever accent the user picks. */
 ${SCOPE}:root ${BRAND_BUTTONS} {
   color: var(--motix-on-primary) !important;
 }
 ${SCOPE} #root :is(button, a)${BRAND_BUTTONS} {
-  box-shadow: var(--motix-glow) !important;${buttonOffset ? `\n  font-size: calc(0.875rem + ${buttonOffset}px) !important;` : ''}
+  box-shadow: var(--motix-glow) !important;
 }
 ${playerReset}
 ${scopedCustomCss(theme.customCss ?? '')}`;

@@ -43,6 +43,35 @@ export function mix(from: Rgb, to: Rgb, amount: number): Rgb {
   return [0, 1, 2].map((index) => Math.round(from[index]! + (to[index]! - from[index]!) * amount)) as unknown as Rgb;
 }
 
+/** What CSS `filter: hue-rotate()` does to a colour (it is a matrix, not a true HSL rotation). */
+export function hueRotate([r, g, b]: Rgb, degrees: number): Rgb {
+  const angle = (degrees * Math.PI) / 180;
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  const clamp = (value: number) => Math.round(Math.min(255, Math.max(0, value)));
+  return [
+    clamp(r * (0.213 + c * 0.787 - s * 0.213) + g * (0.715 - c * 0.715 - s * 0.715) + b * (0.072 - c * 0.072 + s * 0.928)),
+    clamp(r * (0.213 - c * 0.213 + s * 0.143) + g * (0.715 + c * 0.285 + s * 0.14) + b * (0.072 - c * 0.072 - s * 0.283)),
+    clamp(r * (0.213 - c * 0.213 - s * 0.787) + g * (0.715 - c * 0.715 + s * 0.715) + b * (0.072 + c * 0.928 + s * 0.072)),
+  ];
+}
+
+/** The `hue-rotate()` angle that brings `source` closest to the hue of `target`. */
+export function hueRotationTo(source: Rgb, target: Rgb): number {
+  const targetHue = rgbToHsl(target)[0];
+  let best = 0;
+  let bestDistance = Infinity;
+  for (let degrees = 0; degrees < 360; degrees += 1) {
+    const distance = Math.abs(rgbToHsl(hueRotate(source, degrees))[0] - targetHue);
+    const wrapped = Math.min(distance, 360 - distance);
+    if (wrapped < bestDistance) {
+      best = degrees;
+      bestDistance = wrapped;
+    }
+  }
+  return best;
+}
+
 // WCAG relative luminance, used to pick readable text on a coloured surface.
 export function isLight(color: Rgb): boolean {
   const [r = 0, g = 0, b = 0] = color.map((channel) => {

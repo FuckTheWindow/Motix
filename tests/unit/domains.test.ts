@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildManifest } from '../../scripts/lib/manifest';
-import { isThemesPath } from '../../src/content/route-detector';
+import { isThemesPath, returnPath, themesUrlFrom } from '../../src/content/route-detector';
 import { isSupportedMovixDomain, isValidHostname, MOVIX_DOMAINS } from '../../src/shared/domains';
 import fakeDomains from '../fixtures/fake-domains.json' with { type: 'json' };
 
@@ -51,4 +51,18 @@ test('/themes route detection works with or without trailing slash', () => {
   assert.equal(isThemesPath('/themes/'), true);
   assert.equal(isThemesPath('/themes/extra'), false);
   assert.equal(isThemesPath('/movies'), false);
+});
+
+test('opening the editor remembers the page it was opened from', () => {
+  const url = themesUrlFrom('/movie/42', '?tab=cast');
+  assert.equal(url, '/themes?return=%2Fmovie%2F42%3Ftab%3Dcast');
+  assert.equal(returnPath(url.slice(url.indexOf('?'))), '/movie/42?tab=cast');
+  assert.equal(themesUrlFrom('/themes/', '?return=%2Fx'), '/themes/?return=%2Fx', 'already on the editor: nothing to remember');
+});
+
+test('the editor only ever returns to a path on the same site', () => {
+  assert.equal(returnPath('?return=%2Fmovie%2F42%3Ftab%3Dcast'), '/movie/42?tab=cast');
+  for (const search of ['', '?return=', '?return=%2F%2Fevil.test', '?return=https%3A%2F%2Fevil.test', '?return=%2F%5Cevil.test', '?return=javascript%3Aalert(1)']) {
+    assert.equal(returnPath(search), '/', search);
+  }
 });

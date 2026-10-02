@@ -31,7 +31,7 @@ Après un nouveau build, rechargez l'extension et actualisez les onglets Movix o
 
 ## Utilisation
 
-Ouvrez un site Movix et cliquez sur l'icône Motix dans la barre d'outils. La fenêtre permet d'activer ou de désactiver Motix pour ce site et de choisir un thème. **Customize theme** ouvre l'éditeur complet dans un nouvel onglet ; **Open Themes page** affiche le même éditeur dans le site, à l'adresse `/themes`. L'interface de l'extension est en anglais.
+Ouvrez un site Movix et cliquez sur l'icône Motix dans la barre d'outils. La fenêtre permet d'activer ou de désactiver Motix pour ce site et de choisir un thème. **Customize theme** ouvre l'éditeur dans le site, à l'adresse `/themes` ; **← Back to Movix** ramène à la page où vous étiez. Depuis un autre onglet, **Open Motix Themes** ouvre l'éditeur dans un onglet à part. L'interface de l'extension est en anglais.
 
 ## Domaines pris en charge
 

@@ -24,6 +24,8 @@ function previewVariables(theme: MotixTheme): CSSProperties {
     '--preview-accent': colors.primary,
     '--preview-radius': `${theme.radius}px`,
     '--preview-shadow': lift + glow,
+    '--preview-font': theme.style === 'retro' ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : 'inherit',
+    '--preview-button-scale': 0.8 + theme.buttonSize / 250,
   } as CSSProperties;
 }
 

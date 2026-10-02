@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { navigateToThemesRoute, openEditorTab } from '../../shared/browser';
+import { openEditorInActiveTab, openEditorTab } from '../../shared/browser';
 import { selectTheme, setEnabled } from '../../shared/storage';
 import { DEFAULT_THEMES } from '../../theme/presets';
 import { Brand } from '../components/Brand';
@@ -19,6 +19,11 @@ export function PopupApp({ site }: { site?: string }) {
     await setEnabled(!enabled, scope);
     await reload();
     setMessage(enabled ? 'Motix is off for this site.' : 'Motix is on for this site.');
+  };
+
+  const customize = async () => {
+    if (await openEditorInActiveTab()) window.close();
+    else setMessage('Reload this Movix tab, then try again.');
   };
 
   return (
@@ -48,8 +53,8 @@ export function PopupApp({ site }: { site?: string }) {
             {[...DEFAULT_THEMES, ...settings.customThemes].map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
           </select>
           <div className="motix-popup-actions">
-            <button type="button" className="motix-btn motix-btn-primary" onClick={() => void openEditorTab(hostname)}>Customize theme</button>
-            <button type="button" className="motix-btn" onClick={() => void navigateToThemesRoute()}>Open Themes page</button>
+            {/* The editor opens inside the site, where "Back to Movix" returns to the page the user was on. */}
+            <button type="button" className="motix-btn motix-btn-primary" onClick={() => void customize()}>Customize theme</button>
           </div>
         </>
       ) : (

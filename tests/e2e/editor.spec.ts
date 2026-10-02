@@ -16,13 +16,27 @@ test('a customised preset is saved as a new theme and applied to the open site',
   await editor.locator('.motix-preset', { hasText: dracula.name }).click();
   await editor.getByRole('button', { name: '2 · Colors' }).click();
   await editor.getByLabel('Button color', { exact: true }).fill('#ff8800');
+  await editor.getByRole('button', { name: 'Next step →' }).click();
+  await editor.getByLabel('Button size').fill('100');
+  await editor.getByLabel('Lettering').selectOption('retro');
+  // The preview shows shape and lettering changes before anything is saved.
+  await expect(editor.locator('.motix-preview-card button')).toHaveCSS('zoom', '1.2');
+  await expect(editor.locator('.motix-preview-frame')).toHaveCSS('font-family', /monospace/);
+
   await editor.getByRole('button', { name: '4 · Name' }).click();
   await editor.getByLabel('Theme name').fill('Halloween');
+  await editor.getByRole('button', { name: 'Next step →' }).click();
+  // Last step: nothing comes next, and the theme applies everywhere unless the user narrows it.
+  await expect(editor.getByRole('button', { name: 'Next step →' })).toHaveCount(0);
+  await expect(editor.getByLabel('Use this theme')).toHaveValue('global');
   await editor.getByRole('button', { name: 'Save theme' }).click();
   await expect(editor.getByRole('status')).toHaveText('Your theme has been saved and applied!');
 
   await expect(site.locator('html')).toHaveAttribute('data-motix-theme', /^custom-/);
   await expect(site.locator('#cta')).toHaveCSS('background-color', 'rgb(255, 136, 0)');
+  await expect(site.locator('#cta')).toHaveCSS('zoom', '1.2');
+  await expect(site.locator('#cta')).toHaveCSS('font-family', /monospace/);
+  await expect(site.locator('#player-button')).toHaveCSS('zoom', '1');
 
   // The preset itself is untouched, and the new theme is offered next to it.
   await editor.getByRole('button', { name: '1 · Style' }).click();
@@ -35,6 +49,8 @@ test('a customised preset is saved as a new theme and applied to the open site',
 
 test('the preview reflects the draft and switches between screen sizes', async ({ openExtensionPage }) => {
   const editor = await openExtensionPage('themes.html');
+  // Opened on its own, the editor still offers a way to Movix.
+  await expect(editor.getByRole('link', { name: 'Go to Movix →' })).toHaveAttribute('href', `https://${SITE}/`);
   const frame = editor.locator('.motix-preview-frame');
   await editor.locator('.motix-preset', { hasText: dracula.name }).click();
   await expect(frame).toHaveCSS('background-color', 'rgb(40, 42, 54)');

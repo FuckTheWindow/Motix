@@ -115,8 +115,8 @@ export function SaveStep({ name, hostname, applyScope, onScopeChange }: SaveStep
         <>
           <label className="motix-label" htmlFor="apply-scope">Use this theme</label>
           <select id="apply-scope" className="motix-select" value={applyScope} onChange={(event) => onScopeChange(event.currentTarget.value as ApplyScope)}>
-            <option value="domain">Only on {hostname}</option>
             <option value="global">On every Movix website</option>
+            <option value="domain">Only on {hostname}</option>
           </select>
         </>
       ) : (

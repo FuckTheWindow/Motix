@@ -31,7 +31,7 @@ After rebuilding, reload the extension and refresh any open Movix tab.
 
 ## Using it
 
-Open a Movix site and click the Motix toolbar icon. The popup lets you switch Motix on or off for that site and pick a theme. **Customize theme** opens the full editor in a new tab; **Open Themes page** shows the same editor inside the site at `/themes`.
+Open a Movix site and click the Motix toolbar icon. The popup lets you switch Motix on or off for that site and pick a theme. **Customize theme** opens the editor inside the site, at `/themes`; **← Back to Movix** returns to the page you were on. From any other tab, **Open Motix Themes** opens the editor in its own tab.
 
 ## Supported domains
 

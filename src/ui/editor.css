@@ -109,3 +109,5 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @media (max-width:850px) { .motix-layout { grid-template-columns:1fr; } .motix-preview-panel { order:-1; } }
 @media (max-width:560px) { .motix-page-wrap { padding:23px 14px 34px; } .motix-topbar { padding:0 15px; } .motix-intro { align-items:flex-start; flex-direction:column; } .motix-layout { gap:13px; } .motix-panel { padding:16px; border-radius:16px; } .motix-presets { grid-template-columns:repeat(2,minmax(0,1fr)); } .motix-color-grid { grid-template-columns:1fr; } .motix-steps { grid-template-columns:repeat(2,1fr); } .motix-top-actions .motix-btn { padding:7px 9px; } }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; } }
+.motix-preview-frame { font-family:var(--preview-font,inherit); }
+.motix-preview-frame button { zoom:var(--preview-button-scale,1); font-family:inherit; }

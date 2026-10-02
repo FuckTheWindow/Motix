@@ -6,6 +6,8 @@ export { isValidHostname, normalizeHostname };
 // Single source of truth, refreshed from https://movix.online/address.json by `pnpm sync:domains`.
 // The manifests are generated from the same file, so the two can never disagree.
 export const MOVIX_DOMAINS: readonly string[] = directory.domains;
+/** The address Movix currently advertises as its main one. */
+export const MOVIX_PRIMARY_DOMAIN: string = directory.primary;
 
 export function isSupportedMovixDomain(hostname: string, roots: readonly string[] = MOVIX_DOMAINS): boolean {
   const candidate = normalizeHostname(hostname);

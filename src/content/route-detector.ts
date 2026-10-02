@@ -1,4 +1,20 @@
-export const isThemesPath = (pathname: string): boolean => pathname.replace(/\/+$/, '') === '/themes';
+const THEMES_PATH = '/themes';
+const RETURN_PARAM = 'return';
+
+export const isThemesPath = (pathname: string): boolean => pathname.replace(/\/+$/, '') === THEMES_PATH;
+
+/** `/themes`, remembering the current page so closing the editor can come back to it. */
+export function themesUrlFrom(pathname: string, search: string): string {
+  if (isThemesPath(pathname)) return pathname + search;
+  return `${THEMES_PATH}?${new URLSearchParams({ [RETURN_PARAM]: pathname + search })}`;
+}
+
+/** The same-site path to go back to when the embedded editor closes. */
+export function returnPath(search: string): string {
+  const path = new URLSearchParams(search).get(RETURN_PARAM);
+  // Only a path on this site: `//host` or `/\host` would leave it.
+  return path?.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\') ? path : '/';
+}
 
 const POLL_INTERVAL_MS = 400;
 

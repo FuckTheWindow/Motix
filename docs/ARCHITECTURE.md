@@ -40,7 +40,7 @@ theme ──src/theme/palette.ts──▶ value for each token ──src/theme/t
    | Everything else (success green, warning yellow, third-party brand colours) | Left alone |
    | Neutral shadows | Left alone, so shadows stay dark on every theme |
 
-3. **`src/theme/theme-css.ts`** writes those values into one `<style>` element, plus the few rules a colour remap cannot express (poster cards tinted by inline variables, section titles styled by `<style>` blocks Movix injects at runtime, readable text on the accent colour).
+3. **`src/theme/theme-css.ts`** writes those values into one `<style>` element, plus the few rules a colour remap cannot express (poster cards tinted by inline variables, section titles styled by `<style>` blocks Movix injects at runtime, readable text on the accent colour, button size, and the grid that lights up under the pointer, which Movix paints in red on a canvas and Motix recolours with a `hue-rotate` filter).
 
 Because every token falls back to its original colour, two things come for free:
 

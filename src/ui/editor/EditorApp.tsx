@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MOVIX_PRIMARY_DOMAIN } from '../../shared/domains';
 import { saveTheme, selectTheme, updateSettings } from '../../shared/storage';
 import type { MotixSettings, MotixTheme } from '../../shared/types';
 import { DEFAULT_THEMES } from '../../theme/presets';
@@ -27,7 +28,7 @@ export function EditorApp({ site, onClose }: EditorProps) {
         <div className="motix-top-actions">
           {onClose
             ? <button type="button" className="motix-btn motix-btn-small" onClick={onClose}>← Back to Movix</button>
-            : <a className="motix-btn motix-btn-small" href="https://movix.online/" target="_blank" rel="noreferrer">Movix directory ↗</a>}
+            : <a className="motix-btn motix-btn-small" href={`https://${supported ? hostname : MOVIX_PRIMARY_DOMAIN}/`}>Go to Movix →</a>}
         </div>
       </header>
       <main className="motix-page-wrap">
@@ -76,7 +77,7 @@ function EditorForm({ settings, activeTheme, scope, reload }: EditorFormProps) {
   const [name, setName] = useState(() => customName(activeTheme));
   const [css, setCss] = useState(activeTheme.customCss ?? '');
   const [step, setStep] = useState(1);
-  const [applyScope, setApplyScope] = useState<ApplyScope>(scope ? 'domain' : 'global');
+  const [applyScope, setApplyScope] = useState<ApplyScope>('global');
   const [saving, setSaving] = useState(false);
   // Held locally so the checkbox answers at once instead of waiting for the storage round trip.
   const [themePlayer, setThemePlayer] = useState(settings.themePlayer);
@@ -160,8 +161,8 @@ function EditorForm({ settings, activeTheme, scope, reload }: EditorFormProps) {
         {step === 5 && <SaveStep name={finalName} hostname={scope} applyScope={applyScope} onScopeChange={setApplyScope} />}
 
         <div className="motix-actions">
-          <button className="motix-btn" type="button" onClick={() => setStep(step - 1)} disabled={step === 1}>← Previous</button>
-          <button className="motix-btn" type="button" onClick={() => setStep(step + 1)} disabled={step === STEP_LABELS.length}>Next step →</button>
+          {step > 1 && <button className="motix-btn" type="button" onClick={() => setStep(step - 1)}>← Previous</button>}
+          {step < STEP_LABELS.length && <button className="motix-btn" type="button" onClick={() => setStep(step + 1)}>Next step →</button>}
         </div>
         <div className="motix-editor-section">
           <div className="motix-actions">

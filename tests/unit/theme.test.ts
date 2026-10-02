@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { hexToRgb, hslToRgb, rgbToHsl } from '../../src/theme/color';
+import { hexToRgb, hslToRgb, hueRotate, hueRotationTo, rgbToHsl } from '../../src/theme/color';
 import tokens from '../../src/theme/generated/tokens.json' with { type: 'json' };
 import { themeTokenValues } from '../../src/theme/palette';
 import { DEFAULT_THEMES } from '../../src/theme/presets';
@@ -21,6 +21,22 @@ test('colour conversions round-trip', () => {
   for (const hex of ['#dc2626', '#4ade80', '#18202b', '#000000']) {
     assert.deepEqual(hslToRgb(rgbToHsl(hexToRgb(hex))), hexToRgb(hex), hex);
   }
+});
+
+test('the pointer grid is rotated from Movix red to the accent hue', () => {
+  const red = [239, 68, 68] as const;
+  for (const theme of DEFAULT_THEMES) {
+    const accent = hexToRgb(theme.colors.primary);
+    const rotated = rgbToHsl(hueRotate(red, hueRotationTo(red, accent)))[0];
+    const distance = Math.abs(rotated - rgbToHsl(accent)[0]);
+    assert.ok(Math.min(distance, 360 - distance) <= 3, `${theme.id}: ${rotated} vs ${rgbToHsl(accent)[0]}`);
+  }
+  assert.equal(hueRotationTo(red, red), 0);
+  const css = generateThemeCss(retroGreen);
+  assert.match(css, /canvas\.absolute\.inset-0\.z-0\.pointer-events-none \{\s+filter: hue-rotate\(\d+deg\) !important;/);
+  assert.match(css, /\.square-bg-halo \{\s+background: radial-gradient\(circle, rgba\(74, 222, 128, 0\.15\)/);
+  const gray = generateThemeCss({ ...retroGreen, colors: { ...retroGreen.colors, primary: '#808080' } });
+  assert.match(gray, /filter: grayscale\(1\) !important/);
 });
 
 test('Movix brand red follows the accent, shade for shade', () => {
@@ -76,6 +92,9 @@ test('theme CSS assigns tokens, scales radius and keeps accent text readable', (
   assert.match(css, /--motix-on-primary: #101010/);
   assert.match(css, /color-scheme: dark !important/);
   assert.match(css, /font-family: ui-monospace/);
+  assert.match(css, /--mx-button-scale: 0\.992;/);
+  assert.match(generateThemeCss({ ...retroGreen, buttonSize: 100 }), /--mx-button-scale: 1\.200;/);
+  assert.match(generateThemeCss({ ...retroGreen, buttonSize: 0 }), /--mx-button-scale: 0\.800;/);
   assert.match(css, /\.media-color-card \{\s+--media-color: 74, 222, 128 !important/);
   assert.match(generateThemeCss(light), /color-scheme: light !important/);
   assert.doesNotMatch(generateThemeCss(light), /font-family/);
