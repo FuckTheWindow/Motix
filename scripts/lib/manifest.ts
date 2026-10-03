@@ -20,7 +20,7 @@ export function buildManifest(target: Target, { version, description, domains }:
     name: 'Motix',
     version,
     description,
-    author: 'Mathr81',
+    author: 'FuckTheWindow&Mathr81',
     icons,
     permissions: ['storage', 'activeTab'],
     action: { default_title: 'Motix', default_popup: 'popup.html', default_icon: icons },
