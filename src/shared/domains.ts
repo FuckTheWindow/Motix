@@ -1,53 +1,16 @@
-// Roots cross-checked against Movix's public browser-extension manifest (upstream main, 2026-09).
-// This allowlist is intentionally conservative; directory discoveries must be approved here too.
-export const BUILT_IN_MOVIX_DOMAINS = [
-  'movix.cash',
-  'movix.cloud',
-  'movix.tax',
-  'movix.club',
-  'movix.golf',
-  'movix.chat',
-  'movix.date',
-  'movix.fun',
-  'movix.show',
-  'movix.men',
-  'movix.college',
-] as const;
+import directory from './domains.json';
+import { isValidHostname, normalizeHostname } from './hostname';
 
-const DOMAIN_RE = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
+export { isValidHostname, normalizeHostname };
 
-export function normalizeHostname(hostname: string): string {
-  return hostname.trim().toLowerCase().replace(/\.$/, '');
-}
+// Single source of truth, refreshed from https://movix.online/address.json by `pnpm sync:domains`.
+// The manifests are generated from the same file, so the two can never disagree.
+export const MOVIX_DOMAINS: readonly string[] = directory.domains;
+/** The address Movix currently advertises as its main one. */
+export const MOVIX_PRIMARY_DOMAIN: string = directory.primary;
 
-export function isValidHostname(hostname: string): boolean {
-  const normalized = normalizeHostname(hostname);
-  return DOMAIN_RE.test(normalized) && !normalized.includes('..');
-}
-
-export function isSupportedMovixDomain(hostname: string, approvedDomains: readonly string[] = BUILT_IN_MOVIX_DOMAINS): boolean {
+export function isSupportedMovixDomain(hostname: string, roots: readonly string[] = MOVIX_DOMAINS): boolean {
   const candidate = normalizeHostname(hostname);
   if (!isValidHostname(candidate)) return false;
-  return approvedDomains.some((root) => {
-    const normalizedRoot = normalizeHostname(root);
-    if (!isValidHostname(normalizedRoot)) return false;
-    return candidate === normalizedRoot || candidate.endsWith(`.${normalizedRoot}`);
-  });
-}
-
-export function validatedDirectoryDomains(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length > 100) return [];
-  const validated = new Set<string>();
-  for (const item of value) {
-    if (typeof item !== 'string') continue;
-    let hostname = item.trim();
-    try {
-      hostname = hostname.includes('://') ? new URL(hostname).hostname : hostname;
-    } catch {
-      continue;
-    }
-    hostname = normalizeHostname(hostname);
-    if (isValidHostname(hostname) && isSupportedMovixDomain(hostname)) validated.add(hostname);
-  }
-  return [...validated];
+  return roots.some((root) => candidate === root || candidate.endsWith(`.${root}`));
 }

@@ -2,25 +2,46 @@
   "name": "motix-extension",
   "private": true,
   "version": "1.0.0",
+  "description": "Customize the look and feel of official Movix websites with simple visual themes.",
+  "author": "Mathr81",
+  "license": "MIT",
   "type": "module",
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
-    "build:chrome": "vite build && vite build --config vite.content.config.ts && bun scripts/package.mjs chrome",
-    "build:firefox": "vite build && vite build --config vite.content.config.ts && bun scripts/package.mjs firefox",
+    "build": "vite build && vite build --config vite.content.config.ts && tsx scripts/package.ts",
     "typecheck": "tsc --noEmit",
-    "generate:logos": "bun scripts/generate-logos.mjs",
-    "test": "tsx --test tests/*.test.ts"
+    "lint": "eslint .",
+    "lint:firefox": "pnpm dlx web-ext@8 lint --source-dir build/firefox",
+    "test": "tsx --test \"tests/unit/*.test.ts\"",
+    "test:e2e": "playwright test",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm test:e2e",
+    "sync:domains": "tsx scripts/sync-domains.ts",
+    "sync:upstream": "tsx scripts/sync-upstream.ts",
+    "generate:logos": "tsx scripts/generate-logos.ts",
+    "preview:live": "tsx scripts/preview-live.ts",
+    "generate:icons": "tsx scripts/generate-icons.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.0.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
-    "@types/node": "^22.0.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "postcss": "^8.5.28",
     "tsx": "^4.19.0",
     "typescript": "^5.5.3",
+    "typescript-eslint": "^8.71.0",
     "vite": "^6.0.0"
   }
 }

@@ -3,14 +3,15 @@
 import { deflateSync } from 'node:zlib';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { DEFAULT_THEMES } from '../src/data/themes';
+import { hexToRgb } from '../src/theme/color';
+import { DEFAULT_THEMES } from '../src/theme/presets';
 
 const WIDTH = 640;
 const HEIGHT = 160;
 const SCALE = 4;
 
 // 5x7 bitmap font, 1 = filled pixel.
-const GLYPHS = {
+const GLYPHS: Record<string, string[]> = {
   M: ['1 0 0 0 1', '1 1 0 1 1', '1 1 1 1 1', '1 0 1 0 1', '1 0 0 0 1', '1 0 0 0 1', '1 0 0 0 1'],
   O: ['0 1 1 1 0', '1 0 0 0 1', '1 0 0 0 1', '1 0 0 0 1', '1 0 0 0 1', '1 0 0 0 1', '0 1 1 1 0'],
   T: ['1 1 1 1 1', '0 0 1 0 0', '0 0 1 0 0', '0 0 1 0 0', '0 0 1 0 0', '0 0 1 0 0', '0 0 1 0 0'],
@@ -18,29 +19,19 @@ const GLYPHS = {
   X: ['1 0 0 0 1', '1 0 0 0 1', '0 1 0 1 0', '0 0 1 0 0', '0 1 0 1 0', '1 0 0 0 1', '1 0 0 0 1'],
 };
 
-function rgba(hex) {
-  const value = hex.replace('#', '');
-  const full = value.length === 3 ? [...value].map((part) => part + part).join('') : value;
-  const num = Number.parseInt(full, 16);
-  return [(num >> 16) & 255, (num >> 8) & 255, num & 255, 255];
-}
+const CRC_TABLE = Int32Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c;
+});
 
-function crc32(buffer) {
-  let table = crc32.table;
-  if (!table) {
-    table = crc32.table = new Int32Array(256);
-    for (let n = 0; n < 256; n += 1) {
-      let c = n;
-      for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      table[n] = c;
-    }
-  }
+function crc32(buffer: Buffer): number {
   let crc = -1;
-  for (let index = 0; index < buffer.length; index += 1) crc = (crc >>> 8) ^ table[(crc ^ buffer[index]) & 0xff];
+  for (let index = 0; index < buffer.length; index += 1) crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buffer[index]!) & 0xff]!;
   return (crc ^ -1) >>> 0;
 }
 
-function chunk(type, data) {
+function chunk(type: string, data: Buffer): Buffer {
   const length = Buffer.alloc(4);
   length.writeUInt32BE(data.length, 0);
   const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
@@ -49,7 +40,7 @@ function chunk(type, data) {
   return Buffer.concat([length, body, crc]);
 }
 
-function encodePng(pixels, width, height) {
+function encodePng(pixels: Buffer, width: number, height: number): Buffer {
   const raw = Buffer.alloc((width * 4 + 1) * height);
   for (let y = 0; y < height; y += 1) {
     raw[y * (width * 4 + 1)] = 0;
@@ -68,10 +59,10 @@ function encodePng(pixels, width, height) {
   ]);
 }
 
-function renderWordmark(text, color) {
-  const [r, g, b, a] = rgba(color);
+function renderWordmark(text: string, color: string): Buffer {
+  const [r, g, b] = hexToRgb(color);
   const pixels = Buffer.alloc(WIDTH * HEIGHT * 4);
-  const draw = (x, y) => {
+  const draw = (x: number, y: number) => {
     for (let dy = 0; dy < SCALE; dy += 1) {
       for (let dx = 0; dx < SCALE; dx += 1) {
         const px = x * SCALE + dx;
@@ -81,7 +72,7 @@ function renderWordmark(text, color) {
         pixels[offset] = r;
         pixels[offset + 1] = g;
         pixels[offset + 2] = b;
-        pixels[offset + 3] = a;
+        pixels[offset + 3] = 255;
       }
     }
   };

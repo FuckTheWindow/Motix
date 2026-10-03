@@ -1,5 +1,6 @@
 export type Atmosphere = 'retro' | 'cyberpunk' | 'cinema' | 'nature' | 'ocean' | 'arcade' | 'minimal' | 'terminal';
 export type ThemeStyle = 'classic' | 'modern' | 'retro' | 'futuristic' | 'minimal';
+export type PreviewMode = 'desktop' | 'tablet' | 'mobile';
 
 export interface ThemeColors {
   background: string;
@@ -17,34 +18,26 @@ export interface MotixTheme {
   id: string;
   name: string;
   description: string;
-  atmosphere: Atmosphere;
   colors: ThemeColors;
   radius: number;
   shadow: number;
   glow: number;
-  contrast: number;
   buttonSize: number;
   style: ThemeStyle;
+  // Kept so themes exported by earlier versions still import; neither affects the generated CSS.
+  atmosphere: Atmosphere;
+  contrast: number;
   customCss?: string;
   isCustom?: boolean;
 }
 
 export interface MotixSettings {
-  schemaVersion: number;
+  schemaVersion: 2;
   globalThemeId: string;
   domainThemes: Record<string, string>;
   customThemes: MotixTheme[];
-  customCss: Record<string, string>;
-  supportedDomains: string[];
-  userDomains: string[];
   motixEnabled: boolean;
-  disabledDomains: string[];
   perDomainEnabled: Record<string, boolean>;
-  directoryCacheAt: number;
-  previewMode: 'desktop' | 'tablet' | 'mobile';
-}
-
-export interface MotixMessage {
-  type: 'APPLY_THEME' | 'REMOVE_THEME' | 'GET_ACTIVE_THEME' | 'SAVE_THEME' | 'DELETE_THEME' | 'RESET_THEME' | 'IMPORT_THEME' | 'EXPORT_THEME' | 'SET_MOTIX_ENABLED' | 'GET_SUPPORTED_DOMAINS' | 'REFRESH_SUPPORTED_DOMAINS' | 'OPEN_THEMES_PAGE';
-  payload?: unknown;
+  themePlayer: boolean;
+  previewMode: PreviewMode;
 }

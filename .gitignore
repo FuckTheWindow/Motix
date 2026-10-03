@@ -38,3 +38,7 @@ Desktop.ini
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# Browser test output
+/playwright-report/
+/test-results/
