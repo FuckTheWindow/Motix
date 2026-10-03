@@ -34,7 +34,7 @@ test('none of the fake domains Movix warns about is supported', () => {
 test('both manifests are generated from the same domain list', () => {
   const input = { version: '1.2.3', description: 'test', domains: ['movix.example', 'movix.test'] };
   const chrome = buildManifest('chrome', input) as { content_scripts: Array<{ matches: string[]; run_at: string }>; web_accessible_resources: Array<{ matches: string[] }>; permissions: string[] };
-  const firefox = buildManifest('firefox', input) as typeof chrome & { browser_specific_settings: unknown };
+  const firefox = buildManifest('firefox', input) as typeof chrome & { browser_specific_settings: { gecko: { id: string } } };
   const expected = ['*://*.movix.example/*', '*://*.movix.test/*'];
   for (const manifest of [chrome, firefox]) {
     assert.deepEqual(manifest.content_scripts[0]!.matches, expected);
@@ -43,7 +43,7 @@ test('both manifests are generated from the same domain list', () => {
     assert.deepEqual(manifest.permissions, ['storage', 'activeTab']);
   }
   assert.equal('browser_specific_settings' in chrome, false);
-  assert.ok(firefox.browser_specific_settings);
+  assert.equal(firefox.browser_specific_settings.gecko.id, 'motix@fuckthewindow');
 });
 
 test('/themes route detection works with or without trailing slash', () => {

@@ -8,7 +8,7 @@ export interface ManifestInput {
 
 export const ICON_SIZES = [16, 32, 48, 128] as const;
 // Firefox requires an email-shaped add-on ID; it identifies the extension and is never contacted.
-const GECKO_ID = 'motix@mathr81';
+const GECKO_ID = 'motix@fuckthewindow';
 
 /** Both browser manifests come from this one function, so they cannot drift apart. */
 export function buildManifest(target: Target, { version, description, domains }: ManifestInput): Record<string, unknown> {
@@ -20,7 +20,7 @@ export function buildManifest(target: Target, { version, description, domains }:
     name: 'Motix',
     version,
     description,
-    author: 'FuckTheWindow&Mathr81',
+    author: 'FuckTheWindow & Mathr81',
     icons,
     permissions: ['storage', 'activeTab'],
     action: { default_title: 'Motix', default_popup: 'popup.html', default_icon: icons },

@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "Customize the look and feel of official Movix websites with simple visual themes.",
-  "author": "Mathr81",
+  "author": "FuckTheWindow & Mathr81",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@12.8.1",
