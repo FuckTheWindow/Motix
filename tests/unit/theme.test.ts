@@ -24,7 +24,7 @@ test('colour conversions round-trip', () => {
 });
 
 test('labels over an accent pill (active tabs) use the readable on-accent colour', () => {
-  assert.match(generateThemeCss(light), /:is\(button, a\):has\(> \.absolute:is\(\.bg-red-500, \.bg-red-600[^{]*\{\s*color: var\(--motix-on-primary\) !important;/);
+  assert.match(generateThemeCss(light), /:is\(button, a\):has\(> \.absolute\.inset-0:is\(\.bg-red-500, \.bg-red-600[^{]*\{\s*color: var\(--motix-on-primary\) !important;/);
 });
 
 test('on the accent, Movix white (labels, counters, their pills) becomes the on-accent colour', () => {
@@ -34,6 +34,12 @@ test('on the accent, Movix white (labels, counters, their pills) becomes the on-
   assert.match(rule, /--mx-bg-255-255-255: 255,255,255;/);
   const lightAccent = { ...light, colors: { ...light.colors, primary: '#fde047' } };
   assert.match(generateThemeCss(lightAccent), /--mx-fg-255-255-255: 16,16,16;/);
+});
+
+test('only an accent pill covering the tab recolours its label, not an accent underline', () => {
+  const css = generateThemeCss(light);
+  assert.ok(css.includes(':is(button, a):has(> .absolute.inset-0:is(.bg-red-500'));
+  assert.ok(!css.includes(':is(button, a):has(> .absolute:is(.bg-red-500'), 'an underline indicator must not turn the label white');
 });
 
 test('the pointer grid is rotated from Movix red to the accent hue', () => {
@@ -130,7 +136,9 @@ test('custom CSS is scoped, and dropped when it targets the page shell', () => {
   assert.ok(scoped.includes('[data-motix-theme] .a { border-width: 2px; }'));
   assert.ok(scoped.includes('[data-motix-theme] .b, [data-motix-theme] .c { margin: 0; }'));
   assert.doesNotMatch(generateThemeCss({ ...retroGreen, customCss: 'body { display: none; }' }), /display:\s*none/);
-  assert.doesNotMatch(generateThemeCss({ ...retroGreen, customCss: '@media print { .a { display: none; } }' }), /display:\s*none/);
+  // @media is the one at-rule allowed (and its rules are scoped); any other is dropped with the rest.
+  assert.ok(generateThemeCss({ ...retroGreen, customCss: '@media print { .a { display: none; } }' }).includes('@media print {\n[data-motix-theme] .a { display: none; }\n}'));
+  assert.doesNotMatch(generateThemeCss({ ...retroGreen, customCss: '@supports (display: grid) { .a { display: none; } }' }), /display:\s*none/);
 });
 
 test('custom CSS blocks scripts, urls, imports, and unbalanced rules', () => {
@@ -177,4 +185,43 @@ test('light themes veil dark detail-page backdrops; every theme turns the header
   const darkCss = generateThemeCss(retroGreen);
   assert.doesNotMatch(darkCss, /brightness\(3\)/);
   assert.match(darkCss, /header > \.absolute\.inset-0\.pointer-events-none\.bg-gradient-to-b \{\s*background: rgb\(7 16 11 \/ 0\.82\)/, 'dark themes get it too, in their own background colour');
+});
+
+test('custom CSS cannot load remote resources in disguise', () => {
+  for (const css of [
+    '#root .x { background-image: u\\72 l(https://evil.test/a.png); }',
+    '#root .x { background-image: image-set("https://evil.test/a.png" 1x); }',
+    '#root .x { background-image: -webkit-image-set("https://evil.test/a.png" 1x); }',
+    '#root .x { background-image: cross-fade(image("https://evil.test/a.png"), red 50%); }',
+  ]) {
+    assert.equal(validateCustomCss(css).valid, false, css);
+    assert.doesNotMatch(generateThemeCss({ ...retroGreen, customCss: css }), /evil\.test/, css);
+  }
+});
+
+test('what the editor accepts as custom CSS is exactly what reaches the page', () => {
+  const rejected: Array<[string, RegExp]> = [
+    ['@font-face { font-family: X; }', /Only @media/],
+    ['@supports (display: grid) { #root .x { color: red; } }', /Only @media/],
+    ['@media (max-width: 600px) { @media print { #root .x { color: red; } } }', /Only @media|one level/],
+    ['@media (max-width: 600px) { body .x { color: red; } }', /cannot target html, body or :root/],
+    ['#root .md\\:px-12 { padding: 0; }', /Backslashes/],
+    ['#root .a { color: red; } stray', /Only plain/],
+    ['body .x { color: red; }', /cannot target html, body or :root/],
+  ];
+  for (const [css, error] of rejected) assert.match(validateCustomCss(css).error ?? '', error, css);
+
+  const accepted = '#root [class~="md:px-12"], #root header nav { padding: 0; }\n/* note */ #root .section-title::after { display: none; }';
+  assert.equal(validateCustomCss(accepted).valid, true);
+  const css = generateThemeCss({ ...retroGreen, customCss: accepted });
+  assert.ok(css.includes('[data-motix-theme] #root [class~="md:px-12"], [data-motix-theme] #root header nav { padding: 0; }'));
+  assert.ok(css.includes('[data-motix-theme] #root .section-title::after { display: none; }'));
+});
+
+test('one level of @media is allowed, and its rules are scoped like the others', () => {
+  const custom = '#root .a { color: red; }\n@media (min-width: 1024px) and (hover: hover) { #root header { width: 240px; } #root .b, #root .c { gap: 0; } }';
+  assert.equal(validateCustomCss(custom).valid, true);
+  const css = generateThemeCss({ ...retroGreen, customCss: custom });
+  assert.ok(css.includes('[data-motix-theme] #root .a { color: red; }'));
+  assert.ok(css.includes('@media (min-width: 1024px) and (hover: hover) {\n[data-motix-theme] #root header { width: 240px; }\n[data-motix-theme] #root .b, [data-motix-theme] #root .c { gap: 0; }\n}'));
 });

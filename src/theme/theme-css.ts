@@ -5,7 +5,7 @@ import type { MotixTheme } from '../shared/types';
 import { hexToRgb, hueRotationTo, isLight, rgbToHsl } from './color';
 import tokens from './generated/tokens.json';
 import { isNeutralToken, themeTokenValues } from './palette';
-import { validateCustomCss } from './validation';
+import { parseCustomCss, validateCustomCss, type CustomRule } from './validation';
 
 export interface ThemeCssOptions {
   /** Restyle the video player too. Off by default so playback UI keeps Movix's own look. */
@@ -25,8 +25,8 @@ const INLINE_ARTWORK = '[style*="background-image"][style*="url("]:not(.fixed)';
 const CAPTIONED_ARTWORK = ':has(> .absolute.bg-gradient-to-t[class*="from-black"])';
 const ARTWORK_SCOPE = `:is(:has(> img.absolute), .carousel-card, ${SPOTLIGHT}, ${INLINE_ARTWORK}, ${CAPTIONED_ARTWORK})`;
 // Solid buttons and badges in a fixed, non-brand colour (blue trailer, green download): their white text must stay white.
-const COLORED_FILLS = `:is(${['blue', 'green', 'emerald', 'teal', 'cyan', 'indigo', 'purple', 'pink', 'orange', 'yellow']
-  .flatMap((hue) => [500, 600, 700].flatMap((shade) => [`.bg-${hue}-${shade}`, `.from-${hue}-${shade}`])).join(', ')})`;
+const COLORED_FILLS = `:is(${['blue', 'sky', 'cyan', 'teal', 'emerald', 'green', 'lime', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose', 'orange', 'amber', 'yellow']
+  .flatMap((hue) => [500, 600, 700, 800].flatMap((shade) => [`.bg-${hue}-${shade}`, `.from-${hue}-${shade}`])).join(', ')})`;
 const BRAND_BUTTONS = ':is(.bg-red-500, .bg-red-600, .bg-red-700, .hover\\:bg-red-500:hover, .hover\\:bg-red-600:hover, .hover\\:bg-red-700:hover)';
 // Movix's corners are designed around this radius; the slider scales them relative to it.
 const BASE_RADIUS_PX = 12;
@@ -42,20 +42,10 @@ const WHITE_TOKENS = ['fg-255-255-255', 'bg-255-255-255', 'bd-255-255-255'];
 
 function scopedCustomCss(css: string): string {
   if (!css || !validateCustomCss(css).valid) return '';
-  const clean = css.replace(/\/\*[\s\S]*?\*\//g, '').trim();
-  if (!clean) return '';
-  let consumed = '';
-  const rules: string[] = [];
-  const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
-  let match: RegExpExecArray | null;
-  while ((match = rulePattern.exec(clean))) {
-    const selectors = match[1]!.trim().split(',').map((selector) => selector.trim());
-    if (selectors.some((selector) => !selector || /(^|\s)(?:html|body|:root)(?:$|[\s.#:[>+~])/i.test(selector) || /[\\@]/.test(selector))) return '';
-    consumed += match[0];
-    rules.push(`${selectors.map((selector) => `[data-motix-theme] ${selector}`).join(', ')} { ${match[2]!.trim()} }`);
-  }
-  // Anything left over between rules means the input was not plain `selector { declarations }` CSS.
-  return consumed.length === clean.length ? rules.join('\n') : '';
+  const scope = (rules: CustomRule[]) => rules
+    .map(({ selectors, body }) => `${selectors.map((selector) => `[data-motix-theme] ${selector}`).join(', ')} { ${body} }`)
+    .join('\n');
+  return (parseCustomCss(css) ?? []).map(({ media, rules }) => (media ? `@media ${media} {\n${scope(rules)}\n}` : scope(rules))).join('\n');
 }
 
 // Full-page backdrops (detail pages): the film's artwork under an inline black gradient.
@@ -235,12 +225,12 @@ ${SCOPE}:root ${BRAND_BUTTONS} {
 ${SCOPE} #root :is(button, a)${BRAND_BUTTONS} {
   box-shadow: var(--motix-glow) !important;
 }
-/* Active tabs draw their accent pill as an absolutely positioned child behind the label. */
-${SCOPE} #root :is(button, a):has(> .absolute${BRAND_BUTTONS}) {
+/* Active tabs draw their accent pill as a child covering the button (inset-0); an accent underline does not count. */
+${SCOPE} #root :is(button, a):has(> .absolute.inset-0${BRAND_BUTTONS}) {
   color: var(--motix-on-primary) !important;
 }
 /* On the accent, Movix's white (inner labels, counters and their translucent pills) means "readable on the accent". */
-${SCOPE} #root :is(${BRAND_BUTTONS}, :is(button, a):has(> .absolute${BRAND_BUTTONS})) {
+${SCOPE} #root :is(${BRAND_BUTTONS}, :is(button, a):has(> .absolute.inset-0${BRAND_BUTTONS})) {
   ${WHITE_TOKENS.filter((name) => name in tokenValues).map((name) => `--mx-${name}: ${onPrimary.join(',')};`).join(' ')}
 }
 ${playerReset}

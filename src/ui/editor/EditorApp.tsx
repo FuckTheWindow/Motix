@@ -1,58 +1,72 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { MOVIX_PRIMARY_DOMAIN } from '../../shared/domains';
-import { saveTheme, selectTheme, updateSettings } from '../../shared/storage';
-import type { MotixSettings, MotixTheme } from '../../shared/types';
-import { DEFAULT_THEMES } from '../../theme/presets';
+import { PREVIEW_THEME_MESSAGE } from '../../shared/editor-messages';
+import { deleteCustomTheme, domainOverrides, getSettings, resolveActiveTheme, saveSettings, saveTheme, selectTheme, storeCustomTheme, updateSettings } from '../../shared/storage';
+import type { MotixSettings, MotixTheme, ThemeColors } from '../../shared/types';
+import { DEFAULT_THEMES, findTheme } from '../../theme/presets';
 import { parseThemeImport, validateCustomCss } from '../../theme/validation';
-import { Brand } from '../components/Brand';
+import { Icon } from '../components/Icon';
 import { ThemePreview } from '../components/ThemePreview';
+import { Wordmark } from '../components/Wordmark';
 import { useMotixData } from '../hooks/useMotixData';
-import { AdvancedPanel } from './AdvancedPanel';
-import { ColorsStep, NameStep, SaveStep, ShapeStep, STEP_LABELS, StyleStep, type ApplyScope } from './steps';
+import { t, translateError } from '../i18n';
+import { textOn, uiAccent } from '../ui-color';
+import { SaveBar, type ApplyScope, type Toast } from './SaveBar';
+import { AdvancedSection, ColorsSection, ShapeSection, ThemeSection } from './sections';
 
-const FALLBACK_NAME = 'My Custom Theme';
+const TOAST_MS = 6000;
+const SAVED_FLASH_MS = 1600;
 
 interface EditorProps {
   site?: string;
-  /** Present when the editor is embedded in a Movix page; closes it and returns to the site. */
+  /** Present when the editor is docked beside a Movix page; closes it and hands the page back. */
   onClose?: () => void;
+}
+
+/** The accent the editor dresses itself in: the theme being edited, so the tool takes on the user's colours. */
+export function accentStyle(accent: string): CSSProperties {
+  const ui = uiAccent(accent);
+  return { '--mx-accent': ui, '--mx-on-accent': textOn(ui) } as CSSProperties;
 }
 
 export function EditorApp({ site, onClose }: EditorProps) {
   const { settings, hostname, supported, scope, activeTheme, reload } = useMotixData(site);
+  const embedded = Boolean(onClose);
 
   return (
-    <div className={`motix-shell ${onClose ? 'motix-embedded' : ''}`} id="top">
-      <header className="motix-topbar">
-        <Brand />
-        <div className="motix-top-actions">
-          {onClose
-            ? <button type="button" className="motix-btn motix-btn-small" onClick={onClose}>← Back to Movix</button>
-            : <a className="motix-btn motix-btn-small" href={`https://${supported ? hostname : MOVIX_PRIMARY_DOMAIN}/`}>Go to Movix →</a>}
-        </div>
-      </header>
-      <main className="motix-page-wrap">
-        <div className="motix-intro">
-          <div>
-            <span className="motix-eyebrow">YOUR MOVIX, YOUR STYLE</span>
-            <h1 className="motix-h1">Customize your Movix experience</h1>
-            <p>Pick a look, play with colors, and see your changes instantly. No code, no complicated settings—just make it feel like yours.</p>
-          </div>
-          {hostname && <div className="motix-domain-pill">{supported ? '●' : '○'} {hostname}{supported ? ' · Supported' : ' · Not supported'}</div>}
-        </div>
-        {/* The form owns a draft seeded from storage, so it only mounts once settings have loaded. */}
-        {settings && activeTheme && <EditorForm settings={settings} activeTheme={activeTheme} scope={scope} reload={reload} />}
-      </main>
+    <div className={`mx-app ${embedded ? 'mx-app-embedded' : 'mx-app-page'}`}>
+      {/* The form owns a draft seeded from storage, so it only mounts once settings have loaded. */}
+      {settings && activeTheme
+        ? <EditorForm settings={settings} activeTheme={activeTheme} hostname={hostname} supported={supported} scope={scope} reload={reload} onClose={onClose} />
+        : <div className="mx-loading" aria-busy="true" />}
     </div>
   );
 }
 
-function customName(theme: MotixTheme): string {
-  return theme.isCustom ? theme.name : `My ${theme.name} Theme`;
+const isPreset = (theme: MotixTheme) => DEFAULT_THEMES.some((preset) => preset.id === theme.id);
+
+const COLOR_KEYS: Array<keyof ThemeColors> = ['background', 'surface', 'card', 'cardHover', 'primary', 'primaryHover', 'text', 'muted', 'border'];
+
+/**
+ * Everything about a theme that changes how Movix looks. Colours are read in a fixed order: storage hands
+ * objects back with their keys sorted, so the same theme must not compare as different after a save.
+ */
+function lookOf(theme: MotixTheme, css: string): string {
+  const { colors, radius, shadow, glow, buttonSize, style } = theme;
+  return JSON.stringify([COLOR_KEYS.map((key) => colors[key].toLowerCase()), radius, shadow, glow, buttonSize, style === 'retro', css.trim()]);
 }
 
-function newThemeId(): string {
-  return `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+const defaultName = (theme: MotixTheme) => (theme.isCustom ? theme.name : t('defaultName', { name: theme.name }));
+const newThemeId = () => `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
+/** The name, or the name with a number, so two custom themes never share one. */
+function uniqueName(name: string, customThemes: MotixTheme[], exceptId?: string): string {
+  const taken = new Set(customThemes.filter((theme) => theme.id !== exceptId).map((theme) => theme.name.toLowerCase()));
+  if (!taken.has(name.toLowerCase())) return name;
+  for (let index = 2; ; index++) {
+    const candidate = `${name.slice(0, 44)} ${index}`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
 }
 
 function download(filename: string, content: string): void {
@@ -64,134 +78,244 @@ function download(filename: string, content: string): void {
   URL.revokeObjectURL(url);
 }
 
+const fileName = (name: string) => `${name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'motix-theme'}.motix.json`;
+
+interface Draft { theme: MotixTheme; css: string; name: string }
+const draftOf = (theme: MotixTheme): Draft => ({ theme, css: theme.customCss ?? '', name: defaultName(theme) });
+
 interface EditorFormProps {
   settings: MotixSettings;
   activeTheme: MotixTheme;
+  hostname: string;
+  supported: boolean;
   scope?: string;
   /** Storage change events keep an installed extension in sync; the dev server has none, so writes reload explicitly. */
   reload: () => Promise<void>;
+  onClose?: () => void;
 }
 
-function EditorForm({ settings, activeTheme, scope, reload }: EditorFormProps) {
-  const [draft, setDraft] = useState(activeTheme);
-  const [name, setName] = useState(() => customName(activeTheme));
-  const [css, setCss] = useState(activeTheme.customCss ?? '');
-  const [step, setStep] = useState(1);
-  const [applyScope, setApplyScope] = useState<ApplyScope>('global');
+function EditorForm({ settings, activeTheme, hostname, supported, scope, reload, onClose }: EditorFormProps) {
+  const [draft, setDraft] = useState<Draft>(() => draftOf(activeTheme));
+  // A site-specific save is the default: it matches the popup, and never overrides other sites' choices.
+  const [applyScope, setApplyScope] = useState<ApplyScope>(scope ? 'site' : 'global');
   const [saving, setSaving] = useState(false);
-  // Held locally so the checkbox answers at once instead of waiting for the storage round trip.
+  const [justSaved, setJustSaved] = useState(false);
+  const [toast, setToast] = useState<Toast>();
+  const [cssError, setCssError] = useState<string>();
+  // The theme whose deletion awaits a second click; any other theme selected cancels it.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string>();
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
+  // Held locally so the switch answers at once instead of waiting for the storage round trip.
   const [themePlayer, setThemePlayer] = useState(settings.themePlayer);
-  const [status, setStatus] = useState<{ error: boolean; text: string } | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  // Open on the active theme, wherever it sits in the gallery.
+  useEffect(() => {
+    mainRef.current?.querySelector('input[name="mx-editor-theme"]:checked')?.closest('.mx-tile')?.scrollIntoView({ block: 'center' });
+  }, []);
+  const cssRef = useRef<HTMLTextAreaElement>(null);
+  const advancedRef = useRef<HTMLDetailsElement>(null);
 
-  const finalName = name.trim() || FALLBACK_NAME;
-  const notify = (text: string) => setStatus({ error: false, text });
-  const fail = (reason: unknown, fallback: string) => setStatus({ error: true, text: reason instanceof Error ? reason.message : fallback });
+  const { theme, css, name } = draft;
+  // The stored version of the theme the draft started from: what "modified" and "unsaved" compare against.
+  const stored = findTheme(theme.id, settings.customThemes) ?? theme;
+  const lookChanged = lookOf(theme, css) !== lookOf(stored, stored.customCss ?? '');
+  const preset = isPreset(theme);
+  const nameChanged = !preset && name.trim() !== stored.name;
+  const dirty = lookChanged || nameChanged || theme.id !== activeTheme.id;
+  const finalName = name.trim() || t('fallbackName');
+  const confirmingDelete = confirmDeleteId === theme.id;
+  const where = applyScope === 'site' && scope ? scope : t('everywhere');
+  const activeWhere = scope && settings.domainThemes[scope] ? scope : t('everywhere');
 
-  const load = (theme: MotixTheme) => {
-    setDraft(theme);
-    setName(customName(theme));
-    setCss(theme.customCss ?? '');
-    setStatus(null);
+  const notify = useCallback((next: Toast) => setToast(next), []);
+  useEffect(() => {
+    if (!toast || toast.error) return undefined;
+    const timer = window.setTimeout(() => setToast(undefined), TOAST_MS);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+  useEffect(() => {
+    if (!justSaved) return undefined;
+    const timer = window.setTimeout(() => setJustSaved(false), SAVED_FLASH_MS);
+    return () => window.clearTimeout(timer);
+  }, [justSaved]);
+
+  // Docked beside Movix, every draft change shows on the real page before anything is saved.
+  const previewTheme = useMemo<MotixTheme | null>(() => {
+    if (theme.id === 'original' && !lookChanged) return null;
+    return { ...theme, customCss: validateCustomCss(css).valid ? css : stored.customCss ?? '' };
+  }, [theme, css, lookChanged, stored]);
+  useEffect(() => {
+    if (onClose) window.parent.postMessage({ type: PREVIEW_THEME_MESSAGE, theme: previewTheme }, '*');
+  }, [onClose, previewTheme]);
+
+  const update = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
+  const updateTheme = (patch: Partial<MotixTheme>) => setDraft((current) => ({ ...current, theme: { ...current.theme, ...patch } }));
+
+  const load = (next: MotixTheme) => {
+    const previous = draft;
+    setDraft(draftOf(next));
+    setCssError(undefined);
+    // Switching away from unsaved work is one click, so it is also one click to get it back.
+    if (dirty && next.id !== theme.id) notify({ text: t('loadedStatus', { name: next.name }), undo: () => setDraft(previous) });
   };
 
   const save = async () => {
     const cssCheck = validateCustomCss(css);
-    if (!cssCheck.valid) { setStatus({ error: true, text: cssCheck.error ?? 'Please check your extra styles.' }); return; }
-    // Editing a preset never overwrites it: the result is saved as a new custom theme.
-    const theme: MotixTheme = { ...draft, id: draft.isCustom ? draft.id : newThemeId(), name: finalName, customCss: css, isCustom: true };
+    if (!cssCheck.valid) {
+      const message = translateError(cssCheck.error);
+      setCssError(message);
+      if (advancedRef.current) advancedRef.current.open = true;
+      // The error sits on the field itself (announced there), which is opened and focused.
+      cssRef.current?.focus();
+      return;
+    }
+    const target = applyScope === 'site' ? scope : undefined;
     setSaving(true);
     try {
-      await saveTheme(theme, applyScope === 'domain' ? scope : undefined);
+      if (preset && !lookChanged) {
+        await selectTheme(theme.id, target);
+        notify({ text: t('appliedStatus', { name: theme.name, where }) });
+      } else {
+        // Editing a preset never overwrites it: the result becomes a new custom theme.
+        const saved: MotixTheme = {
+          ...theme,
+          id: preset ? newThemeId() : theme.id,
+          name: uniqueName(finalName, settings.customThemes, preset ? undefined : theme.id),
+          customCss: css,
+          isCustom: true,
+        };
+        await saveTheme(saved, target);
+        setDraft(draftOf(saved));
+        notify({ text: t('savedStatus', { name: saved.name, where }) });
+      }
       await reload();
-      setDraft(theme);
-      notify('Your theme has been saved and applied!');
+      setJustSaved(true);
     } catch (reason) {
-      fail(reason, 'Could not save your theme.');
+      notify({ text: translateError(reason), error: true });
     } finally {
       setSaving(false);
     }
   };
 
-  const reset = async () => {
-    await selectTheme('original', scope);
+  const discard = () => {
+    setDraft(draftOf(activeTheme));
+    setCssError(undefined);
+    notify({ text: t('discardedStatus') });
+  };
+
+  const duplicate = async () => {
+    const copy: MotixTheme = { ...theme, customCss: css, id: newThemeId(), name: uniqueName(t('copySuffix', { name: finalName }).slice(0, 48), settings.customThemes), isCustom: true };
+    try {
+      await storeCustomTheme(copy);
+      await reload();
+      setDraft(draftOf(copy));
+      notify({ text: t('duplicatedStatus', { name: copy.name }) });
+      nameRef.current?.focus();
+    } catch (reason) {
+      notify({ text: translateError(reason), error: true });
+    }
+  };
+
+  const remove = async () => {
+    if (!confirmingDelete) { setConfirmDeleteId(theme.id); return; }
+    const before = settings;
+    const deleted = theme;
+    await deleteCustomTheme(deleted.id);
     await reload();
-    load(DEFAULT_THEMES[0]!);
-    notify('The original Movix look is back.');
+    setConfirmDeleteId(undefined);
+    const restore = async () => { await saveSettings(before); await reload(); setDraft(draftOf(deleted)); };
+    // Load whatever is now active here, since the deleted theme may have been it.
+    setDraft(draftOf(resolveActiveTheme(await getSettings(), scope)));
+    notify({ text: t('deletedStatus', { name: deleted.name }), undo: () => void restore() });
   };
 
   const importTheme = async (file: File) => {
     try {
-      load(parseThemeImport(await file.text()));
-      notify('Theme imported. Save it to keep it on this device.');
+      const imported = parseThemeImport(await file.text());
+      // An imported file must not silently replace a theme already on this device.
+      const fresh = settings.customThemes.some((existing) => existing.id === imported.id) ? { ...imported, id: newThemeId() } : imported;
+      setDraft(draftOf(fresh));
+      notify({ text: t('importedStatus') });
     } catch (reason) {
-      fail(reason, 'Could not import this theme.');
+      notify({ text: translateError(reason), error: true });
     }
   };
 
   const exportTheme = () => {
-    const content = JSON.stringify({ schemaVersion: 1, theme: { ...draft, name: finalName, customCss: css } }, null, 2);
-    download(`${finalName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.motix.json`, content);
+    const content = JSON.stringify({ schemaVersion: 1, theme: { ...theme, name: finalName, customCss: css } }, null, 2);
+    download(fileName(finalName), content);
   };
 
+  const requestClose = useCallback(() => {
+    if (!onClose) return;
+    if (dirty) setConfirmingLeave(true);
+    else onClose();
+  }, [dirty, onClose]);
+
+  // Ctrl/Cmd+S saves from anywhere; Escape closes the docked editor (asking first if work would be lost).
+  const saveRef = useRef(save);
+  useEffect(() => { saveRef.current = save; });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void saveRef.current(); }
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        if (confirmingLeave) setConfirmingLeave(false);
+        else requestClose();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirmingLeave, requestClose]);
+
+  const replacedSites = domainOverrides(settings, scope).length;
+  const siteLabel = hostname && !supported ? t('unsupportedSite', { host: hostname }) : scope ?? t('allSites');
+
   return (
-    <div className="motix-layout">
-      <section className="motix-panel">
-        <div className="motix-panel-head">
-          <div><h2>Make it yours</h2><p>Follow the steps or jump to anything you want.</p></div>
-          <span className="motix-domain-pill">Step {step} of {STEP_LABELS.length}</span>
-        </div>
-        <nav className="motix-steps" aria-label="Editor steps">
-          {STEP_LABELS.map((label, index) => (
-            <button type="button" key={label} aria-current={step === index + 1 ? 'step' : undefined} aria-pressed={step === index + 1} onClick={() => setStep(index + 1)}>
-              {index + 1} · {label}
-            </button>
-          ))}
-        </nav>
-
-        {step === 1 && <StyleStep themes={[...DEFAULT_THEMES, ...settings.customThemes]} selectedId={draft.id} onSelect={load} />}
-        {step === 2 && <ColorsStep theme={draft} onChange={(key, value) => setDraft((current) => ({ ...current, colors: { ...current.colors, [key]: value } }))} />}
-        {step === 3 && (
-          <ShapeStep
-            theme={draft}
-            onSliderChange={(key, value) => setDraft((current) => ({ ...current, [key]: value }))}
-            onMonospaceChange={(monospace) => setDraft((current) => ({ ...current, style: monospace ? 'retro' : 'modern' }))}
-          />
-        )}
-        {step === 4 && <NameStep theme={draft} name={name} onChange={setName} />}
-        {step === 5 && <SaveStep name={finalName} hostname={scope} applyScope={applyScope} onScopeChange={setApplyScope} />}
-
-        <div className="motix-actions">
-          {step > 1 && <button className="motix-btn" type="button" onClick={() => setStep(step - 1)}>← Previous</button>}
-          {step < STEP_LABELS.length && <button className="motix-btn" type="button" onClick={() => setStep(step + 1)}>Next step →</button>}
-        </div>
-        <div className="motix-editor-section">
-          <div className="motix-actions">
-            <button className="motix-btn motix-btn-primary" type="button" disabled={saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save theme'}</button>
-            <button className="motix-btn" type="button" onClick={() => { load(activeTheme); notify('Your unsaved changes were cancelled.'); }}>Cancel</button>
-            <button className="motix-btn motix-btn-danger" type="button" onClick={() => void reset()}>Reset to original</button>
+    <div className="mx-editor" style={accentStyle(theme.colors.primary)}>
+      <div className="mx-editor-column">
+        <header className="mx-header">
+          <Wordmark />
+          <div className="mx-header-title">
+            <h1>{t('themes')}</h1>
+            <span className={`mx-site ${scope ? 'mx-site-on' : ''}`}><span className="mx-site-dot" aria-hidden="true" />{siteLabel}</span>
           </div>
-          {status && <p className={`motix-notice ${status.error ? 'motix-error' : ''}`} role={status.error ? 'alert' : 'status'}>{status.text}</p>}
-        </div>
-        <AdvancedPanel
-          css={css}
-          onCssChange={setCss}
-          themePlayer={themePlayer}
-          onThemePlayerChange={(next) => { setThemePlayer(next); void updateSettings({ themePlayer: next }).then(reload); }}
-          onImport={(file) => void importTheme(file)}
-          onExport={exportTheme}
+          {onClose
+            ? <button type="button" className="mx-button mx-button-quiet mx-button-icon" aria-label={t('closeEditor')} title={t('closeEditor')} onClick={requestClose}><Icon name="close" size={18} /></button>
+            : <a className="mx-button mx-button-quiet mx-button-small" href={`https://${scope ?? MOVIX_PRIMARY_DOMAIN}/`}>{t('goToMovix')}<Icon name="external" /></a>}
+        </header>
+
+        <main className="mx-editor-main" ref={mainRef}>
+          <ThemeSection
+            customThemes={settings.customThemes} draft={{ ...theme, name: preset ? theme.name : finalName }} modified={lookChanged} confirmingDelete={confirmingDelete}
+            onSelect={load} onDuplicate={() => void duplicate()} onExport={exportTheme} onDelete={() => void remove()}
+          />
+          <ColorsSection theme={theme} onChange={(key: keyof ThemeColors, value) => updateTheme({ colors: { ...theme.colors, [key]: value } })} />
+          <ShapeSection
+            theme={theme}
+            onSliderChange={(key, value) => updateTheme({ [key]: value })}
+            onMonospaceChange={(monospace) => updateTheme({ style: monospace ? 'retro' : 'modern' })}
+          />
+          <AdvancedSection
+            css={css} cssError={cssError} cssRef={cssRef} detailsRef={advancedRef}
+            onCssChange={(next) => { update({ css: next }); setCssError(undefined); }}
+            themePlayer={themePlayer}
+            onThemePlayerChange={(next) => { setThemePlayer(next); void updateSettings({ themePlayer: next }).then(reload); }}
+            onImport={(file) => void importTheme(file)}
+            onExport={exportTheme}
+          />
+        </main>
+
+        <SaveBar
+          site={scope} scope={applyScope} onScopeChange={setApplyScope} replacedSites={replacedSites}
+          showName={!preset || lookChanged} name={name} onNameChange={(next) => update({ name: next })} nameRef={nameRef}
+          dirty={dirty} activeWhere={activeWhere} primaryLabel={preset && !lookChanged ? t('apply') : t('save')}
+          saving={saving} justSaved={justSaved} onSave={() => void save()} onDiscard={discard}
+          toast={toast} onDismissToast={() => setToast(undefined)}
+          confirmingLeave={confirmingLeave} onStay={() => setConfirmingLeave(false)} onLeave={() => onClose?.()}
         />
-      </section>
-      <div>
-        <ThemePreview theme={draft} mode={settings.previewMode} onModeChange={(previewMode) => void updateSettings({ previewMode }).then(reload)} />
-        <section className="motix-panel" style={{ marginTop: 16 }}>
-          <div className="motix-panel-head"><div><h2>Made for you</h2><p>These changes only affect how the website looks.</p></div></div>
-          <ul className="motix-help" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.9 }}>
-            <li>No video or account changes</li>
-            <li>Your themes stay on this device</li>
-            <li>Motix does not add ads or collect data</li>
-          </ul>
-        </section>
       </div>
+      {!onClose && <aside className="mx-editor-preview"><ThemePreview theme={theme} mode={settings.previewMode} onModeChange={(previewMode) => void updateSettings({ previewMode }).then(reload)} /></aside>}
     </div>
   );
 }

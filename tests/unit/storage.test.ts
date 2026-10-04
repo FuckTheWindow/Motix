@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { MOVIX_DOMAINS } from '../../src/shared/domains';
-import { defaultSettings, migrateSettings, resolveActiveTheme, resolveEnabled } from '../../src/shared/storage';
+import { defaultSettings, domainOverrides, migrateSettings, resolveActiveTheme, resolveEnabled, withCustomTheme, withoutCustomTheme } from '../../src/shared/storage';
 import { DEFAULT_THEMES } from '../../src/theme/presets';
 
 const DOMAIN = MOVIX_DOMAINS[0]!;
@@ -58,4 +58,28 @@ test('a per-domain switch wins over the global switch', () => {
   assert.equal(resolveEnabled(settings, DOMAIN), true);
   assert.equal(resolveEnabled(settings, MOVIX_DOMAINS[1]), false);
   assert.equal(resolveEnabled(settings), false);
+});
+
+test('custom themes are added or replaced in place, never over a built-in theme', () => {
+  const added = withCustomTheme(defaultSettings(), customTheme);
+  assert.deepEqual(added.customThemes.map((theme) => theme.name), ['My Theme']);
+  const renamed = withCustomTheme(added, { ...customTheme, name: 'Renamed' });
+  assert.deepEqual(renamed.customThemes.map((theme) => theme.name), ['Renamed']);
+  // Storing a theme does not make it active.
+  assert.equal(renamed.globalThemeId, 'original');
+  assert.throws(() => withCustomTheme(added, { ...DEFAULT_THEMES[2]!, isCustom: true }), /built-in theme/);
+});
+
+test('deleting a custom theme falls back to the original look wherever it was active', () => {
+  const settings = { ...withCustomTheme(defaultSettings(), customTheme), globalThemeId: customTheme.id, domainThemes: { [DOMAIN]: customTheme.id, 'other.test': 'ocean-blue' } };
+  const deleted = withoutCustomTheme(settings, customTheme.id);
+  assert.deepEqual(deleted.customThemes, []);
+  assert.equal(deleted.globalThemeId, 'original');
+  assert.deepEqual(deleted.domainThemes, { 'other.test': 'ocean-blue' });
+});
+
+test('a save for every site reports the other sites whose own choice it replaces', () => {
+  const settings = { ...defaultSettings(), domainThemes: { [DOMAIN]: 'ocean-blue', [`sub.${DOMAIN}`]: 'dracula' } };
+  assert.deepEqual(domainOverrides(settings, DOMAIN), [`sub.${DOMAIN}`]);
+  assert.equal(domainOverrides(settings).length, 2);
 });

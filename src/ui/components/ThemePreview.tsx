@@ -1,8 +1,12 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { MotixTheme, PreviewMode } from '../../shared/types';
-import { ThemeLogo } from './ThemeLogo';
+import { t } from '../i18n';
+import { textOn } from '../ui-color';
 
-const MODES: PreviewMode[] = ['desktop', 'tablet', 'mobile'];
+const MODES = [
+  { mode: 'desktop', label: () => t('previewDesktop') },
+  { mode: 'mobile', label: () => t('previewMobile') },
+] as const;
 
 interface Props {
   theme: MotixTheme;
@@ -22,6 +26,7 @@ function previewVariables(theme: MotixTheme): CSSProperties {
     '--preview-text': colors.text,
     '--preview-muted': colors.muted,
     '--preview-accent': colors.primary,
+    '--preview-on-accent': textOn(colors.primary),
     '--preview-radius': `${theme.radius}px`,
     '--preview-shadow': lift + glow,
     '--preview-font': theme.style === 'retro' ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : 'inherit',
@@ -29,45 +34,54 @@ function previewVariables(theme: MotixTheme): CSSProperties {
   } as CSSProperties;
 }
 
-/** A miniature Movix-like page, so changes can be judged before they are saved. */
+/**
+ * A miniature Movix page for when the editor is opened on its own. Opened from a Movix page, the editor
+ * previews on the real site instead and this mock is not shown.
+ */
 export function ThemePreview({ theme, mode, onModeChange }: Props) {
+  // Answers the click at once; the stored preference catches up.
+  const [chosen, setChosen] = useState<PreviewMode>();
+  const current = (chosen ?? mode) === 'mobile' ? 'mobile' : 'desktop';
+  const choose = (next: PreviewMode) => { setChosen(next); onModeChange(next); };
   return (
-    <section className="motix-panel motix-preview-panel" aria-label="Live theme preview">
-      <div className="motix-preview-head">
-        <div className="motix-panel-head" style={{ margin: 0 }}>
-          <div><h2>See it live</h2><p>Your changes show up here right away.</p></div>
+    <section className="mx-preview" aria-labelledby="mx-preview-title">
+      <div className="mx-preview-head">
+        <div>
+          <h2 className="mx-preview-title" id="mx-preview-title">{t('preview')}</h2>
+          <p className="mx-help">{t('previewHint')}</p>
         </div>
-        <div className="motix-preview-tabs" aria-label="Preview size">
-          {MODES.map((size) => (
-            <button type="button" key={size} aria-pressed={mode === size} onClick={() => onModeChange(size)}>
-              {size[0]!.toUpperCase() + size.slice(1)}
-            </button>
+        <div className="mx-segmented" role="radiogroup" aria-label={t('preview')}>
+          {MODES.map(({ mode: value, label }) => (
+            <label key={value} className="mx-segment">
+              <input type="radio" className="mx-cover-input" name="mx-preview-mode" checked={current === value} onChange={() => choose(value)} />
+              <span>{label()}</span>
+            </label>
           ))}
         </div>
       </div>
-      <div className="motix-preview-frame" data-mode={mode} style={previewVariables(theme)}>
-        <div className="motix-preview-nav">
-          <ThemeLogo theme={theme} />
-          <span>Discover · Movies · Series</span>
-          <button type="button" className="motix-preview-menu" aria-label="Preview menu">☰</button>
+      {/* Purely visual: none of it is focusable, so keyboard users are not sent through a fake site. */}
+      <div className="mx-preview-frame" data-mode={current} style={previewVariables(theme)} aria-hidden="true">
+        <div className="mx-preview-nav">
+          <strong className="mx-preview-logo">MOVIX</strong>
+          <span>{t('mockNav')}</span>
         </div>
-        <div className="motix-preview-feature">
-          <span className="motix-preview-badge">✦ FEATURED TONIGHT</span>
-          <h3>A story worth staying in for</h3>
-          <p>Pick a film, get comfortable, and make this space yours.</p>
+        <div className="mx-preview-feature">
+          <span className="mx-preview-badge">{t('mockBadge')}</span>
+          <h3>{t('mockTitle')}</h3>
+          <p>{t('mockText')}</p>
         </div>
-        <div className="motix-preview-card">
-          <div className="motix-poster" aria-label="Decorative movie poster">🎬</div>
+        <div className="mx-preview-card">
+          <div className="mx-preview-poster" />
           <div>
-            <h4>Midnight in the City</h4>
-            <p>A small mystery turns into a big adventure under the neon lights.</p>
-            <button type="button">▶ Play preview</button>
+            <h4>{t('mockCard')}</h4>
+            <p>{t('mockCardText')}</p>
+            <span className="mx-preview-play">{t('mockPlay')}</span>
           </div>
         </div>
-        <div className="motix-progress" aria-label="Progress preview"><span /></div>
-        <div className="motix-preview-modal">
-          <strong>Ready for movie night?</strong>
-          <p>Your watchlist is waiting. Pick up where you left off.</p>
+        <div className="mx-preview-progress"><span /></div>
+        <div className="mx-preview-modal">
+          <strong>{t('mockModal')}</strong>
+          <p>{t('mockModalText')}</p>
         </div>
       </div>
     </section>

@@ -9,8 +9,9 @@ const light = DEFAULT_THEMES.find((theme) => theme.id === 'minimal-light')!;
 const themeAttribute = (page: Page) => page.locator('html').getAttribute('data-motix-theme');
 
 async function pickTheme(popup: Page, themeId: string): Promise<void> {
-  await popup.locator('#quick-theme').selectOption(themeId);
-  await expect(popup.getByRole('status')).toHaveText('Theme changed!');
+  const name = DEFAULT_THEMES.find((theme) => theme.id === themeId)!.name;
+  await popup.getByRole('radio', { name, exact: true }).check();
+  await expect(popup.getByRole('status')).toHaveText(`${name} applied.`);
 }
 
 test('a supported site keeps its original look until a theme is chosen', async ({ openSite }) => {
@@ -66,15 +67,15 @@ test('the video player keeps Movix colours unless the user opts in', async ({ op
   await expect(site.locator('#player-button')).toHaveCSS('border-top-left-radius', '8px');
 
   const editor = await openExtensionPage(`themes.html?site=${SITE}`);
-  await editor.getByRole('button', { name: 'Advanced options' }).click();
-  await editor.getByLabel('Theme the video player too').check();
+  await editor.getByText('Advanced', { exact: true }).click();
+  await editor.getByRole('switch', { name: 'Theme the video player too' }).check();
   await expect(site.locator('#player-button')).toHaveCSS('background-color', rgb(ocean.colors.primary));
 });
 
 test('subdomains of a Movix root are supported', async ({ openSite, openExtensionPage }) => {
   const site = await openSite(SUBDOMAIN);
   const popup = await openExtensionPage(`popup.html?site=${SUBDOMAIN}`);
-  await expect(popup.getByText('Motix is ready')).toBeVisible();
+  await expect(popup.getByText(`On for ${SUBDOMAIN}`)).toBeVisible();
   await pickTheme(popup, ocean.id);
   await expect(site.locator('html')).toHaveAttribute('data-motix-theme', ocean.id);
 });
@@ -82,9 +83,10 @@ test('subdomains of a Movix root are supported', async ({ openSite, openExtensio
 test('unrelated and lookalike hosts are never touched', async ({ openSite, openExtensionPage }) => {
   // Make a theme active everywhere it legitimately can be, then check it leaks nowhere else.
   const editor = await openExtensionPage('themes.html');
-  await editor.locator('.motix-preset', { hasText: ocean.name }).click();
-  await editor.getByRole('button', { name: 'Save theme' }).click();
-  await expect(editor.getByRole('status')).toContainText('saved');
+  await editor.getByRole('radio', { name: ocean.name, exact: true }).check();
+  // An untouched preset is applied as is, never copied into a new custom theme.
+  await editor.getByRole('button', { name: 'Apply' }).click();
+  await expect(editor.getByRole('status')).toHaveText(`${ocean.name} is now active on every Movix site.`);
   const supported = await openSite();
   await expect(supported.locator('#cta')).toHaveCSS('background-color', rgb(ocean.colors.primary));
 
@@ -97,7 +99,8 @@ test('unrelated and lookalike hosts are never touched', async ({ openSite, openE
 
     const popup = await openExtensionPage(`popup.html?site=${host}`);
     await expect(popup.getByText('This site is not supported')).toBeVisible();
-    await expect(popup.getByRole('switch')).toBeDisabled();
+    // Nothing to switch on here, so no switch is offered.
+    await expect(popup.getByRole('switch')).toHaveCount(0);
     await page.close();
     await popup.close();
   }
@@ -109,10 +112,11 @@ test('the switch removes and restores the theme without a reload', async ({ open
   await pickTheme(popup, ocean.id);
   await expect(site.locator('#motix-theme-styles')).toHaveCount(1);
 
-  // Keyboard only: the switch is a real button.
+  // Keyboard only: the switch is a real form control.
   await popup.getByRole('switch').focus();
   await popup.keyboard.press('Space');
-  await expect(popup.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+  await expect(popup.getByRole('switch')).not.toBeChecked();
+  await expect(popup.getByText(`Paused on ${SITE}`)).toBeVisible();
   await expect(site.locator('#motix-theme-styles')).toHaveCount(0);
   expect(await themeAttribute(site)).toBeNull();
   await expect(site.locator('#cta')).toHaveCSS('background-color', MOVIX_RED);

@@ -1,70 +1,87 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { openEditorInActiveTab, openEditorTab } from '../../shared/browser';
 import { selectTheme, setEnabled } from '../../shared/storage';
-import { DEFAULT_THEMES } from '../../theme/presets';
-import { Brand } from '../components/Brand';
-import { ThemeSwatch } from '../components/ThemeSwatch';
+import type { MotixTheme } from '../../shared/types';
+import { Icon } from '../components/Icon';
+import { ThemeGallery } from '../components/ThemeGallery';
+import { Wordmark } from '../components/Wordmark';
+import { accentStyle } from '../editor/EditorApp';
 import { useMotixData } from '../hooks/useMotixData';
+import { t } from '../i18n';
+
+// Motix's own colour, for when there is no theme to borrow one from.
+const BRAND_ACCENT = '#f5a524';
 
 export function PopupApp({ site }: { site?: string }) {
   const { settings, hostname, supported, scope, activeTheme, enabled, reload } = useMotixData(site);
   const [message, setMessage] = useState('');
+  const themesRef = useRef<HTMLDivElement>(null);
+  // Open on the active theme, wherever it sits in the list.
+  const activeId = activeTheme?.id;
+  useEffect(() => {
+    themesRef.current?.querySelector('input:checked')?.closest('.mx-tile')?.scrollIntoView({ block: 'center' });
+  }, [activeId]);
 
-  const chooseTheme = async (id: string) => {
-    await selectTheme(id, scope);
-    await reload();
-    setMessage('Theme changed!');
+  // The click shows at once; storage confirms a moment later.
+  const [pendingId, setPendingId] = useState<string>();
+  const chooseTheme = async (theme: MotixTheme) => {
+    setPendingId(theme.id);
+    try {
+      await selectTheme(theme.id, scope);
+      await reload();
+      setMessage(t('themeChanged', { name: theme.name }));
+    } finally {
+      setPendingId(undefined);
+    }
   };
   const toggle = async () => {
     await setEnabled(!enabled, scope);
     await reload();
-    setMessage(enabled ? 'Motix is off for this site.' : 'Motix is on for this site.');
+    setMessage('');
   };
-
   const customize = async () => {
     if (await openEditorInActiveTab()) window.close();
-    else setMessage('Reload this Movix tab, then try again.');
+    else setMessage(t('reloadTab'));
   };
 
+  // Nothing is drawn until settings arrive, so the accent never flashes from Motix's colour to the theme's.
+  if (!settings) return <main className="mx-popup mx-popup-loading" aria-busy="true" />;
+  const ready = supported && activeTheme;
   return (
-    <main className="motix-shell motix-popup">
-      <Brand />
-      <div className="motix-popup-domain" title={hostname}>{hostname || 'No website tab detected'}</div>
-      <div className="motix-popup-card" style={{ marginTop: 14 }}>
-        <div className="motix-toggle-row">
-          <div>
-            <strong>{supported ? 'Motix is ready' : 'This site is not supported'}</strong>
-            <div className="motix-popup-footer">
-              {supported ? 'Only the look of this site can change.' : 'Motix only runs on official Movix domains.'}
-            </div>
-          </div>
-          <button className="motix-switch" type="button" role="switch" aria-checked={enabled && supported} aria-label="Enable Motix for this website" disabled={!supported} onClick={() => void toggle()} />
-        </div>
-      </div>
+    <main className="mx-popup" style={accentStyle(ready && enabled ? activeTheme.colors.primary : BRAND_ACCENT)}>
+      <header className="mx-popup-head">
+        <Wordmark withTagline />
+        {supported && (
+          <input
+            type="checkbox" role="switch" className="mx-switch" checked={enabled} aria-label={t('popupSwitch', { host: hostname })}
+            onChange={() => void toggle()}
+          />
+        )}
+      </header>
 
-      {supported && settings && activeTheme ? (
+      {ready ? (
         <>
-          <div className="motix-popup-theme">
-            <ThemeSwatch theme={activeTheme} />
-            <div><strong>{activeTheme.name}</strong><small>Active theme</small></div>
+          <div className="mx-popup-status">
+            <strong>{enabled ? t('popupOn', { host: hostname }) : t('popupOff', { host: hostname })}</strong>
+            <span className="mx-help">{enabled ? t('popupOnHint') : t('popupOffHint')}</span>
           </div>
-          <label className="motix-label" htmlFor="quick-theme">Quick theme selection</label>
-          <select id="quick-theme" className="motix-select" value={activeTheme.id} onChange={(event) => void chooseTheme(event.currentTarget.value)}>
-            {[...DEFAULT_THEMES, ...settings.customThemes].map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
-          </select>
-          <div className="motix-popup-actions">
-            {/* The editor opens inside the site, where "Back to Movix" returns to the page the user was on. */}
-            <button type="button" className="motix-btn motix-btn-primary" onClick={() => void customize()}>Customize theme</button>
+          <div className="mx-popup-themes" ref={themesRef}>
+            <ThemeGallery group="mx-popup-theme" label={t('themeFor', { host: hostname })} customThemes={settings.customThemes} selectedId={pendingId ?? activeTheme.id} disabled={!enabled} onSelect={(theme) => void chooseTheme(theme)} />
+          </div>
+          <div className="mx-popup-actions">
+            <button type="button" className="mx-button mx-button-primary mx-button-block" onClick={() => void customize()}>{t('customize')}</button>
+            <span className="mx-help">{t('customizeHint')}</span>
           </div>
         </>
       ) : (
-        <div className="motix-popup-actions">
-          <button type="button" className="motix-btn motix-btn-primary" onClick={() => void openEditorTab()}>Open Motix Themes</button>
+        <div className="mx-popup-empty">
+          <strong>{hostname ? t('notSupported') : t('noSite')}</strong>
+          <p className="mx-help">{hostname ? t('notSupportedHint') : t('noSiteHint')}</p>
+          <button type="button" className="mx-button mx-button-block" onClick={() => void openEditorTab()}>{t('openEditor')}<Icon name="external" /></button>
         </div>
       )}
 
-      {message && <p className="motix-notice" role="status">{message}</p>}
-      <p className="motix-popup-footer">Motix changes colors and style only. Your data stays private on this device.</p>
+      <p className="mx-popup-foot" role="status">{message || t('privacy')}</p>
     </main>
   );
 }
