@@ -23,6 +23,19 @@ test('colour conversions round-trip', () => {
   }
 });
 
+test('labels over an accent pill (active tabs) use the readable on-accent colour', () => {
+  assert.match(generateThemeCss(light), /:is\(button, a\):has\(> \.absolute:is\(\.bg-red-500, \.bg-red-600[^{]*\{\s*color: var\(--motix-on-primary\) !important;/);
+});
+
+test('on the accent, Movix white (labels, counters, their pills) becomes the on-accent colour', () => {
+  const css = generateThemeCss(light);
+  const rule = css.slice(css.indexOf('/* On the accent, Movix'));
+  assert.match(rule, /--mx-fg-255-255-255: 255,255,255;/);
+  assert.match(rule, /--mx-bg-255-255-255: 255,255,255;/);
+  const lightAccent = { ...light, colors: { ...light.colors, primary: '#fde047' } };
+  assert.match(generateThemeCss(lightAccent), /--mx-fg-255-255-255: 16,16,16;/);
+});
+
 test('the pointer grid is rotated from Movix red to the accent hue', () => {
   const red = [239, 68, 68] as const;
   for (const theme of DEFAULT_THEMES) {
@@ -138,4 +151,30 @@ test('theme import accepts a valid custom theme and rejects bad input', () => {
   assert.throws(() => parseThemeImport(JSON.stringify({ id: 'bad', colors: {} })), /invalid settings/);
   assert.throws(() => parseThemeImport(JSON.stringify(retroGreen)), /built-in theme/);
   assert.throws(() => parseThemeImport(JSON.stringify({ ...theme, customCss: '@import "x";' })), /invalid settings/);
+});
+
+test('the spotlight banner anchors its content to the bottom over a scrim, with readable chips', () => {
+  const css = generateThemeCss(retroGreen);
+  const spotlight = '.home-section .bg-cover[style*="background-image"]';
+  assert.ok(css.includes(`${spotlight} > .flex-col.h-full {\n  justify-content: flex-end !important;`));
+  assert.match(css, /bg-cover\[style\*="background-image"\]::after \{[^}]*linear-gradient\(to top, rgb\(0 0 0/);
+  assert.ok(css.includes(`${spotlight} > .absolute.inset-0.pointer-events-none {\n  background: none !important;`), 'Movix\'s own scrims are replaced by ours');
+  assert.match(css, /\.flex-wrap > span\.rounded-full \{[^}]*backdrop-filter: blur\(8px\)/);
+  // Its artwork counts as artwork, so light themes keep its scrims dark.
+  assert.ok(generateThemeCss(light).includes(`.carousel-card, ${spotlight},`));
+});
+
+test('light themes veil dark detail-page backdrops; every theme turns the header into a frosted bar', () => {
+  const lightCss = generateThemeCss(light);
+  assert.match(lightCss, /\.fixed\.inset-0\.pointer-events-none\[style\*="url\("\] \{\s*filter: brightness\(3\)/);
+  assert.ok(lightCss.includes(':has(> .fixed.inset-0.pointer-events-none[style*="url("])::after'), 'the veil is a sibling layer, untouched by the filter');
+  assert.match(lightCss, /linear-gradient\(rgb\(242 244 247 \/ 0\.72\), rgb\(242 244 247 \/ 0\.84\)\)/);
+  assert.match(lightCss, /header > \.absolute\.inset-0\.pointer-events-none\.bg-gradient-to-b \{[^}]*backdrop-filter: blur\(14px\)/);
+  assert.match(lightCss, /\.bg-blue-600, [^{]*\.bg-green-600[^{]*\{\s*color: rgb\(255 255 255\);[^}]*--mx-fg-255-255-255: initial;/, 'white text stays white on coloured buttons');
+  assert.ok(lightCss.includes('[style*="background-image"][style*="url("]:not(.fixed),'), 'inline-image blocks count as artwork');
+  assert.ok(lightCss.includes(':has(> .absolute.bg-gradient-to-t[class*="from-black"]))'), 'captioned thumbnails count as artwork');
+  assert.ok(lightCss.includes('.from-emerald-600'), 'gradient buttons keep white text');
+  const darkCss = generateThemeCss(retroGreen);
+  assert.doesNotMatch(darkCss, /brightness\(3\)/);
+  assert.match(darkCss, /header > \.absolute\.inset-0\.pointer-events-none\.bg-gradient-to-b \{\s*background: rgb\(7 16 11 \/ 0\.82\)/, 'dark themes get it too, in their own background colour');
 });
