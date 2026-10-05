@@ -10,6 +10,7 @@ const PATHS = {
   external: 'M11 5h4v4M15 5l-6 6M13 11.5V15H5V7h3.5',
   warning: 'M10 4.5l6 10.5H4zM10 9v2.8M10 13.4v.1',
   undo: 'M7 6L4 9l3 3M4 9h7a4 4 0 010 8H9',
+  expand: 'M4 8V4h4M16 12v4h-4',
 } as const;
 
 export type IconName = keyof typeof PATHS;

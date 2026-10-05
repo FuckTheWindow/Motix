@@ -121,5 +121,9 @@
 /* Notion corners are barely rounded: pills (buttons, tags, the slider control) get 4px. Avatars and dots stay round. */
 #root :is(button, a, span, div)[class~="rounded-full"]:not(:has(img)) { border-radius: 4px !important; }
 /* Notion text never shimmers: decorative text animations stop (loading spinners and pulses keep running). */
+/* Movix's shine effect (the search page title, hovered card titles) paints its gradient via an inline style set by
+   JS each animation frame, not a class, so the adapter has no selector to hook into. Catch the signature instead:
+   this is what made "Rechercher de…" fade into invisible pink/white text on Notion's white page. */
+#root [style*="-webkit-text-fill-color"] { background: none !important; -webkit-text-fill-color: currentColor !important; color: #37352f !important; }
 #root .footer-vibe-text { animation: none !important; background: none !important; -webkit-text-fill-color: currentColor !important; color: #787774 !important; }
 #root :is(h1, h2, h3, h4, p, span, a)[class*="animate-"]:not([class~="animate-spin"]):not([class~="animate-pulse"]) { animation: none !important; }

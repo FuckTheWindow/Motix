@@ -1,4 +1,7 @@
-import { useId, type ReactNode, type RefObject } from 'react';
+import { css as cssLanguage } from '@codemirror/lang-css';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
+import CodeMirror, { type EditorView, type ReactCodeMirrorRef } from '@uiw/react-codemirror';
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { MotixTheme, ThemeColors } from '../../shared/types';
 import { ColorField } from '../components/ColorField';
 import { Icon } from '../components/Icon';
@@ -7,6 +10,47 @@ import { ThemeGallery } from '../components/ThemeGallery';
 import { t, themeDescription, type MessageKey } from '../i18n';
 import { requestReveal, revealOnOpen } from '../reveal';
 import { contrastRatio } from '../ui-color';
+
+// The repo's own custom-CSS guide (selectors, pitfalls, a pre-ship checklist): docs/CUSTOM_CSS_GUIDE.md,
+// rendered by GitHub. Only resolves once the branch holding it is pushed and merged to main.
+const CUSTOM_CSS_GUIDE_URL = 'https://github.com/FuckTheWindow/Motix/blob/main/docs/CUSTOM_CSS_GUIDE.md';
+
+// A stable array identity, so CodeMirror does not tear down and rebuild its extensions on every render.
+const CSS_EDITOR_EXTENSIONS = [cssLanguage()];
+
+/**
+ * CodeMirror's actual focusable, screen-reader-facing node (contentDOM, inside .cm-content) is not the
+ * element react-codemirror puts id/aria-* props on, so this applies them imperatively instead, once the
+ * view exists. Returns the `onCreateEditor` callback to hand to `<CodeMirror>`.
+ *
+ * Naming it needs `aria-labelledby` or `aria-label`, not `<label for>` + `id`: `for` only establishes an
+ * accessible name on elements HTML calls "labelable" (input, textarea, select, …) — contentDOM is a
+ * `role="textbox"` div, not one of those, so a browser's accessibility tree silently ignores a `for`
+ * pointing at it even though the DOM attributes look right. Caught by an actual accessible-name query
+ * (Playwright's `getByLabel`, which reads the real accessibility tree over CDP) finding nothing, after
+ * inspecting raw DOM attributes said it should have worked.
+ *
+ * The view is captured through `onCreateEditor` — fired deterministically, exactly once, the moment it
+ * exists — rather than read back out through a `RefObject` prop in an effect, which can run before the
+ * library's own internal ref assignment and silently find nothing. It's kept in a plain local `useRef`
+ * (not state) since the DOM node under it is about to be mutated directly: only a ref a component owns
+ * itself, not a prop or a `useState` value, lints as a legitimate place to do that.
+ */
+function useCssEditorA11y(describedBy: string, invalid: boolean, name: { labelledBy: string } | { label: string }): (view: EditorView) => void {
+  const nameValue = 'labelledBy' in name ? name.labelledBy : name.label;
+  const nameAttr = 'labelledBy' in name ? 'aria-labelledby' : 'aria-label';
+  const viewRef = useRef<EditorView | null>(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const content = viewRef.current?.contentDOM;
+    if (!content) return;
+    content.setAttribute(nameAttr, nameValue);
+    content.setAttribute('aria-describedby', describedBy);
+    if (invalid) content.setAttribute('aria-invalid', 'true');
+    else content.removeAttribute('aria-invalid');
+  }, [ready, nameAttr, nameValue, describedBy, invalid]);
+  return (view) => { viewRef.current = view; setReady(true); };
+}
 
 /** A collapsible section; `<details>` gives keyboard and screen-reader behaviour for free. */
 export function Section({ title, open, children }: { title: string; open?: boolean; children: ReactNode }) {
@@ -126,7 +170,7 @@ export function ShapeSection({ theme, onSliderChange, onMonospaceChange }: Shape
 interface AdvancedSectionProps {
   css: string;
   cssError?: string;
-  cssRef: RefObject<HTMLTextAreaElement>;
+  cssRef: RefObject<ReactCodeMirrorRef>;
   detailsRef: RefObject<HTMLDetailsElement>;
   onCssChange: (css: string) => void;
   themePlayer: boolean;
@@ -137,50 +181,120 @@ interface AdvancedSectionProps {
 
 export function AdvancedSection({ css, cssError, cssRef, detailsRef, onCssChange, themePlayer, onThemePlayerChange, onImport, onExport }: AdvancedSectionProps) {
   const cssId = useId();
+  const cssLabelId = `${cssId}-label`;
+  const cssHelpId = `${cssId}-help`;
+  const cssErrorId = `${cssId}-error`;
+  const describedBy = cssError ? `${cssHelpId} ${cssErrorId}` : cssHelpId;
+  const invalid = Boolean(cssError);
+  const onCreateEditor = useCssEditorA11y(describedBy, invalid, { labelledBy: cssLabelId });
+
+  // The inline field is cramped for anything beyond a tweak, so it can open as a bigger modal
+  // instead, filling the docked panel's own viewport edge to edge (the panel itself stays put —
+  // an iframe can't grow past its own box, and there's no need for it to here).
+  const [cssModalOpen, setCssModalOpen] = useState(false);
+  const modalRef = useRef<HTMLDialogElement>(null);
+  const modalTitleId = `${cssId}-modal-title`;
+  const modalOnCreateEditor = useCssEditorA11y(describedBy, invalid, { label: t('cssModalTitle') });
+
+  // The single source of truth for "is it open" is the <dialog> itself: Escape closes it natively,
+  // so state is synced from its own `close` event, not duplicated into every place that could close it.
+  useEffect(() => {
+    const dialog = modalRef.current;
+    if (!dialog) return;
+    const onNativeClose = () => setCssModalOpen(false);
+    dialog.addEventListener('close', onNativeClose);
+    return () => dialog.removeEventListener('close', onNativeClose);
+  }, []);
+  useEffect(() => {
+    const dialog = modalRef.current;
+    if (!dialog) return;
+    if (cssModalOpen && !dialog.open) dialog.showModal();
+    if (!cssModalOpen && dialog.open) dialog.close();
+  }, [cssModalOpen]);
+
   return (
-    <details className="mx-section" ref={detailsRef} onToggle={revealOnOpen}>
-      <summary className="mx-section-head" onClick={requestReveal}>
-        <h2 className="mx-section-title">{t('sectionAdvanced')}</h2>
-        <span className="mx-section-chevron"><Icon name="chevron" /></span>
-      </summary>
-      <div className="mx-section-body">
-        <label className="mx-check">
-          <input type="checkbox" role="switch" className="mx-switch" checked={themePlayer} aria-describedby={`${cssId}-player`} onChange={(event) => onThemePlayerChange(event.currentTarget.checked)} />
-          <span>
-            <span className="mx-label">{t('themePlayer')}</span>
-            <span className="mx-help" id={`${cssId}-player`}>{t('themePlayerHelp')}</span>
-          </span>
-        </label>
-
-        <div className="mx-field">
-          <label className="mx-label" htmlFor={cssId}>{t('customCss')}</label>
-          <span className="mx-help" id={`${cssId}-help`}>{t('customCssHelp')}</span>
-          <textarea
-            ref={cssRef} className="mx-input mx-textarea" id={cssId} value={css} spellCheck={false}
-            placeholder=".section-title { letter-spacing: 2px; }"
-            aria-invalid={cssError ? true : undefined}
-            aria-describedby={cssError ? `${cssId}-help ${cssId}-error` : `${cssId}-help`}
-            onChange={(event) => onCssChange(event.currentTarget.value)}
-          />
-          {cssError && <p className="mx-field-error" id={`${cssId}-error`} role="alert">{cssError}</p>}
-        </div>
-
-        <div className="mx-toolbar">
-          <label className="mx-button mx-button-quiet">
-            <Icon name="upload" />{t('importTheme')}
-            <input
-              type="file" className="mx-visually-hidden" accept=".json,application/json" aria-label={t('importLabel')}
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                // Reset so picking the same file twice still fires a change event.
-                event.currentTarget.value = '';
-                if (file) onImport(file);
-              }}
-            />
+    <>
+      <details className="mx-section" ref={detailsRef} onToggle={revealOnOpen}>
+        <summary className="mx-section-head" onClick={requestReveal}>
+          <h2 className="mx-section-title">{t('sectionAdvanced')}</h2>
+          <span className="mx-section-chevron"><Icon name="chevron" /></span>
+        </summary>
+        <div className="mx-section-body">
+          <label className="mx-check">
+            <input type="checkbox" role="switch" className="mx-switch" checked={themePlayer} aria-describedby={`${cssId}-player`} onChange={(event) => onThemePlayerChange(event.currentTarget.checked)} />
+            <span>
+              <span className="mx-label">{t('themePlayer')}</span>
+              <span className="mx-help" id={`${cssId}-player`}>{t('themePlayerHelp')}</span>
+            </span>
           </label>
-          <button type="button" className="mx-button mx-button-quiet" onClick={onExport}><Icon name="download" />{t('exportTheme')}</button>
+
+          <div className="mx-field">
+            <div className="mx-field-head">
+              <label className="mx-label" id={cssLabelId}>{t('customCss')}</label>
+              <button
+                type="button" className="mx-button mx-button-quiet mx-button-icon mx-button-small" aria-label={t('cssExpand')} title={t('cssExpand')}
+                onClick={() => setCssModalOpen(true)}
+              >
+                <Icon name="expand" size={14} />
+              </button>
+            </div>
+            <span className="mx-help" id={cssHelpId}>
+              {t('customCssHelp')}{' '}
+              <a href={CUSTOM_CSS_GUIDE_URL} target="_blank" rel="noreferrer">{t('customCssGuide')}</a>
+            </span>
+            <CodeMirror
+              ref={cssRef}
+              className={`mx-code-editor${invalid ? ' mx-code-editor-invalid' : ''}`}
+              value={css}
+              theme={vscodeDark}
+              extensions={CSS_EDITOR_EXTENSIONS}
+              placeholder=".section-title { letter-spacing: 2px; }"
+              onChange={onCssChange}
+              onCreateEditor={onCreateEditor}
+            />
+            {cssError && <p className="mx-field-error" id={cssErrorId} role="alert">{cssError}</p>}
+          </div>
+
+          <div className="mx-toolbar">
+            <label className="mx-button mx-button-quiet">
+              <Icon name="upload" />{t('importTheme')}
+              <input
+                type="file" className="mx-visually-hidden" accept=".json,application/json" aria-label={t('importLabel')}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  // Reset so picking the same file twice still fires a change event.
+                  event.currentTarget.value = '';
+                  if (file) onImport(file);
+                }}
+              />
+            </label>
+            <button type="button" className="mx-button mx-button-quiet" onClick={onExport}><Icon name="download" />{t('exportTheme')}</button>
+          </div>
         </div>
-      </div>
-    </details>
+      </details>
+
+      {/* A sibling of <details>, not a descendant: a closed section forces display:none on its own
+          direct children, which would make showModal() throw on a dialog caught in that subtree. */}
+      <dialog ref={modalRef} className="mx-css-modal" aria-labelledby={modalTitleId}>
+        <div className="mx-css-modal-head">
+          <h2 id={modalTitleId}>{t('cssModalTitle')}</h2>
+          <button type="button" className="mx-button mx-button-quiet mx-button-icon" aria-label={t('cssCollapse')} title={t('cssCollapse')} onClick={() => modalRef.current?.close()}>
+            <Icon name="close" size={18} />
+          </button>
+        </div>
+        <CodeMirror
+          className={`mx-code-editor mx-code-editor-large${invalid ? ' mx-code-editor-invalid' : ''}`}
+          value={css}
+          theme={vscodeDark}
+          extensions={CSS_EDITOR_EXTENSIONS}
+          placeholder=".section-title { letter-spacing: 2px; }"
+          onChange={onCssChange}
+          onCreateEditor={modalOnCreateEditor}
+          autoFocus={cssModalOpen}
+        />
+        {/* Only while open: a role="alert" in both places at once would announce the same error twice. */}
+        {cssModalOpen && cssError && <p className="mx-field-error" role="alert">{cssError}</p>}
+      </dialog>
+    </>
   );
 }

@@ -26,6 +26,9 @@
     "generate:icons": "tsx scripts/generate-icons.ts"
   },
   "dependencies": {
+    "@codemirror/lang-css": "^6.3.1",
+    "@uiw/codemirror-theme-vscode": "^4.25.12",
+    "@uiw/react-codemirror": "^4.25.12",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

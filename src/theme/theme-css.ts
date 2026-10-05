@@ -92,6 +92,16 @@ ${SCOPE} #root :has(> ${PAGE_BACKDROP})::after {
   pointer-events: none;
   background: linear-gradient(rgb(${background} / ${BACKDROP_VEIL[0]}), rgb(${background} / ${BACKDROP_VEIL[1]}));
 }
+/* A brand-coloured fill picks white or dark text from its own full-strength colour (below), which is right for an
+   enabled button. Movix fades the current page number to 30% opacity instead of recolouring it, built for its own
+   near-black page: opacity dims the text as much as the fill, so on a light page both the pale-blue background and
+   the fading dark text lose contrast together. A pre-blended background at full opacity keeps the same pale tint
+   without taking the text down with it. */
+${SCOPE} #root ${BRAND_BUTTONS}:disabled {
+  opacity: 1 !important;
+  background-color: rgb(${hexToRgb(c.primary).join(' ')} / 0.3) !important;
+  color: var(--motix-text) !important;
+}
 `;
 }
 

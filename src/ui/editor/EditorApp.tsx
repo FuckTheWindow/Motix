@@ -1,3 +1,4 @@
+import type { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { MOVIX_PRIMARY_DOMAIN } from '../../shared/domains';
 import { PREVIEW_THEME_MESSAGE } from '../../shared/editor-messages';
@@ -113,7 +114,7 @@ function EditorForm({ settings, activeTheme, hostname, supported, scope, reload,
   useEffect(() => {
     mainRef.current?.querySelector('input[name="mx-editor-theme"]:checked')?.closest('.mx-tile')?.scrollIntoView({ block: 'center' });
   }, []);
-  const cssRef = useRef<HTMLTextAreaElement>(null);
+  const cssRef = useRef<ReactCodeMirrorRef>(null);
   const advancedRef = useRef<HTMLDetailsElement>(null);
 
   const { theme, css, name } = draft;
@@ -167,7 +168,7 @@ function EditorForm({ settings, activeTheme, hostname, supported, scope, reload,
       setCssError(message);
       if (advancedRef.current) advancedRef.current.open = true;
       // The error sits on the field itself (announced there), which is opened and focused.
-      cssRef.current?.focus();
+      cssRef.current?.view?.focus();
       return;
     }
     const target = applyScope === 'site' ? scope : undefined;
