@@ -96,6 +96,41 @@ export async function saveTheme(theme: MotixTheme, hostname?: string): Promise<v
   });
 }
 
+/** Adds or replaces a custom theme without changing which theme is active. */
+export function withCustomTheme(settings: MotixSettings, theme: MotixTheme): MotixSettings {
+  if (DEFAULT_THEMES.some((preset) => preset.id === theme.id)) throw new Error('A built-in theme already uses that theme ID.');
+  const index = settings.customThemes.findIndex((existing) => existing.id === theme.id);
+  const customThemes = [...settings.customThemes];
+  if (index === -1) customThemes.push({ ...theme, isCustom: true });
+  else customThemes[index] = { ...theme, isCustom: true };
+  return { ...settings, customThemes };
+}
+
+/** Removes a custom theme; wherever it was active, Movix falls back to its original look. */
+export function withoutCustomTheme(settings: MotixSettings, themeId: string): MotixSettings {
+  return {
+    ...settings,
+    customThemes: settings.customThemes.filter((theme) => theme.id !== themeId),
+    globalThemeId: settings.globalThemeId === themeId ? 'original' : settings.globalThemeId,
+    domainThemes: Object.fromEntries(Object.entries(settings.domainThemes).filter(([, id]) => id !== themeId)),
+  };
+}
+
+export async function storeCustomTheme(theme: MotixTheme): Promise<void> {
+  if (!validateTheme(theme)) throw new Error('This theme has invalid settings.');
+  await saveSettings(withCustomTheme(await getSettings(), theme));
+}
+
+export async function deleteCustomTheme(themeId: string): Promise<void> {
+  await saveSettings(withoutCustomTheme(await getSettings(), themeId));
+}
+
+/** Supported sites whose own theme choice a global save would replace, other than `except`. */
+export function domainOverrides(settings: MotixSettings, except?: string): string[] {
+  const skip = except ? normalizeHostname(except) : undefined;
+  return Object.keys(settings.domainThemes).filter((domain) => domain !== skip);
+}
+
 export async function selectTheme(themeId: string, hostname?: string): Promise<void> {
   assertSupported(hostname);
   const settings = await getSettings();
