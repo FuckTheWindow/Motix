@@ -1,7 +1,9 @@
 {
   "source": "https://movix.online/address.json",
-  "primary": "movix.dog",
+  "primary": "movix.tokyo",
   "domains": [
+    "movix.tokyo",
+    "movix.miami",
     "movix.dog",
     "movix.luxe",
     "movix.college",
